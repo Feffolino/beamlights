@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+- On/off switches are now game rules (per world): `beamlightsBlockSpawns` (SPAWNING, default true) and
+  `beamlightsAttractMobs` (MOBS, default false). Config keys `blockSpawnsInBeam` and `beamAttractsMobs` removed.
+- Op commands `/beamlightsspawns` and `/beamlightsattract` removed. `/beamlights spawns|attract [on|off]` forwards
+  `gamerule <rule> [true|false]` to the server (op permission checked there). Blocked-spawn and attraction-step
+  totals are printed in the rate-limited `debugLog` lines.
+- Weaker mob attraction: only mobs with idle navigation and no target are nudged, with chance `attractChance`
+  (default 0.35) per check, in steps of at most `attractStepDistance` (default 5) blocks toward the lit point;
+  `attractSpeed` default lowered to 0.7. Vanilla targeting and other mods' attractors are never overridden.
+- `/beamlights layout show|pattern|rays|spread|roll|inner|range|budget|luminance|midpoints|custom add|remove|clear|list
+  |preset <default|wide|performance|cliff|floodlight>` edits the ray layout in the client config (saved at once,
+  applied on the next frame). `/beamlights status` names the two game rules.
+
 ## 0.4.0 (unreleased)
 - Configurable ray layout: `rays` replaced by `rayPattern` (CENTER_ONLY, TRIANGLE default = old layout, CROSS, RING,
   DOUBLE_RING, FAN_HORIZONTAL, FAN_VERTICAL, CUSTOM) with `sideRays`, `rayRollOffset`, `innerRays`, `innerSpread`,

@@ -8,8 +8,6 @@ import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
 import it.ratlab.beamlights.core.math.V3;
 import it.ratlab.beamlights.world.LevelOcclusion;
-import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -18,7 +16,6 @@ import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import java.util.ArrayList;
@@ -29,14 +26,19 @@ import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** Server side: hostile mobs without a target walk to the point a beam lights up. Central ray only. */
+/**
+ * Server side: idle hostile mobs without a target drift toward the point a beam lights up, in short steps and only
+ * by chance, so vanilla targeting and other mods' attractors (sounds, scents) always win. Central ray only.
+ */
 @EventBusSubscriber(modid = BeamLights.MOD_ID)
 public final class MobAttractor {
     private static final double EMITTER_SEARCH = 64.0;
     private static final double ARRIVED_RADIUS = 1.5;
     private static final AtomicLong PATHS = new AtomicLong();
 
-    // Last path target per mob; weak keys so removed mobs drop out on their own. Server thread only.
+    private static long lastLogMs;
+
+    // Last step target per mob; weak keys so removed mobs drop out on their own. Server thread only.
     private static final Map<Mob, V3> LAST_TARGET = new WeakHashMap<>();
 
     private MobAttractor() {
@@ -49,7 +51,7 @@ public final class MobAttractor {
     @SubscribeEvent
     static void onLevelTick(LevelTickEvent.Post event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
-        if (!BeamServerConfig.BEAM_ATTRACTS_MOBS.get()) return;
+        if (!BeamGameRules.attractMobs(level)) return;
         if (level.getGameTime() % BeamServerConfig.ATTRACT_INTERVAL.get() != 0) return;
         List<ServerPlayer> players = level.players();
         if (players.isEmpty()) return;
@@ -77,18 +79,30 @@ public final class MobAttractor {
         int maxMobs = BeamServerConfig.ATTRACT_MAX_MOBS.get();
         double speed = BeamServerConfig.ATTRACT_SPEED.get();
         double repath = BeamServerConfig.ATTRACT_REPATH_DISTANCE.get();
+        double chance = BeamServerConfig.ATTRACT_CHANCE.get();
+        double step = BeamServerConfig.ATTRACT_STEP_DISTANCE.get();
         for (Beam beam : beams) {
             BeamTracer.Result r = BeamTracer.trace(beam.origin(), beam.dir(), beam.range(), occlusion);
             if (!r.hit()) continue;
-            attract(level, AttractTarget.litPoint(r.point(), beam.dir()), radius, maxMobs, speed, repath);
+            attract(level, AttractTarget.litPoint(r.point(), beam.dir()), radius, maxMobs, speed, repath, chance, step);
+        }
+        if (BeamServerConfig.DEBUG_LOG.get()) {
+            long now = System.currentTimeMillis();
+            if (now - lastLogMs >= 1000L) {
+                lastLogMs = now;
+                BeamLights.LOG.info("Beam Lights: {} lit beams in {}, {} attraction steps issued since server start",
+                        beams.size(), level.dimension().location(), PATHS.get());
+            }
         }
     }
 
-    private static void attract(ServerLevel level, V3 point, double radius, int maxMobs, double speed, double repath) {
+    private static void attract(ServerLevel level, V3 point, double radius, int maxMobs, double speed, double repath,
+                                double chance, double step) {
         AABB box = new AABB(point.x(), point.y(), point.z(), point.x(), point.y(), point.z()).inflate(radius);
         double radiusSq = radius * radius;
         List<Mob> mobs = level.getEntitiesOfClass(Mob.class, box,
                 m -> m instanceof Enemy && m.isAlive() && m.getTarget() == null && !m.isNoAi()
+                        && m.getNavigation().isDone() // never override an active path (vanilla or another mod)
                         && m.distanceToSqr(point.x(), point.y(), point.z()) <= radiusSq);
         if (mobs.isEmpty()) return;
         mobs.sort(Comparator.comparingDouble(m -> m.distanceToSqr(point.x(), point.y(), point.z())));
@@ -96,25 +110,16 @@ public final class MobAttractor {
         int n = Math.min(maxMobs, mobs.size());
         for (int i = 0; i < n; i++) {
             Mob m = mobs.get(i);
-            if (AttractTarget.arrived(new V3(m.getX(), m.getY(), m.getZ()), point, ARRIVED_RADIUS)) continue;
-            if (!AttractTarget.shouldRepath(LAST_TARGET.get(m), point, repath)) continue;
-            if (m.getNavigation().moveTo(point.x(), point.y(), point.z(), speed)) {
-                LAST_TARGET.put(m, point);
+            V3 pos = new V3(m.getX(), m.getY(), m.getZ());
+            if (AttractTarget.arrived(pos, point, ARRIVED_RADIUS)) continue;
+            if (!AttractTarget.roll(chance, m.getRandom().nextDouble())) continue;
+            // Same step target as last time means the mob could not get there: leave it alone until the light moves.
+            V3 target = AttractTarget.step(pos, point, step);
+            if (!AttractTarget.shouldRepath(LAST_TARGET.get(m), target, repath)) continue;
+            if (m.getNavigation().moveTo(target.x(), target.y(), target.z(), speed)) {
+                LAST_TARGET.put(m, target);
                 PATHS.incrementAndGet();
             }
         }
-    }
-
-    @SubscribeEvent
-    static void onRegisterCommands(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("beamlightsattract")
-                .requires(src -> src.hasPermission(2))
-                .executes(ctx -> {
-                    long n = PATHS.get();
-                    boolean on = BeamServerConfig.BEAM_ATTRACTS_MOBS.get();
-                    ctx.getSource().sendSuccess(() -> Component.literal("Beam Lights: " + n
-                            + " mob paths to lit points issued since server start, attraction enabled: " + on), false);
-                    return (int) Math.min(n, Integer.MAX_VALUE);
-                }));
     }
 }

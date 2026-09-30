@@ -25,4 +25,17 @@ public final class AttractTarget {
     public static boolean arrived(V3 mob, V3 point, double radius) {
         return mob.distSq(point) <= radius * radius;
     }
+
+    /** One short step toward the lit point: the point itself when within maxStep, else maxStep blocks along the way. */
+    public static V3 step(V3 mob, V3 point, double maxStep) {
+        V3 d = point.sub(mob);
+        double len = d.length();
+        if (len <= maxStep || len == 0) return point;
+        return mob.add(d.scale(Math.max(0, maxStep) / len));
+    }
+
+    /** Per-mob chance roll; random is uniform in [0, 1). */
+    public static boolean roll(double chance, double random) {
+        return random < chance;
+    }
 }

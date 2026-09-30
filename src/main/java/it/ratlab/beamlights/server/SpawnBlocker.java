@@ -7,8 +7,6 @@ import it.ratlab.beamlights.core.BeamCone;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.math.V3;
 import it.ratlab.beamlights.world.LevelOcclusion;
-import net.minecraft.commands.Commands;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -17,7 +15,6 @@ import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent;
 
 import java.util.ArrayList;
@@ -50,21 +47,21 @@ public final class SpawnBlocker {
         Mob mob = event.getEntity();
         if (mob.getType().getCategory() != MobCategory.MONSTER) return;
         ServerLevel level = event.getLevel().getLevel();
-        if (level.isClientSide() || !BeamServerConfig.BLOCK_SPAWNS_IN_BEAM.get()) return;
+        if (level.isClientSide() || !BeamGameRules.blockSpawns(level)) return;
 
         V3 point = new V3(event.getX(), event.getY() + mob.getBbHeight() * 0.5, event.getZ());
         Entity emitter = findLitEmitter(level, point);
         if (emitter == null) return;
 
         event.setSpawnCancelled(true);
-        BLOCKED.incrementAndGet();
+        long total = BLOCKED.incrementAndGet();
         if (BeamServerConfig.DEBUG_LOG.get()) {
             long now = System.currentTimeMillis();
             if (now - lastLogMs >= 1000L) {
                 lastLogMs = now;
-                BeamLights.LOG.info("Beam Lights: blocked {} at {} {} {} (beam of {})",
+                BeamLights.LOG.info("Beam Lights: blocked {} at {} {} {} (beam of {}), {} spawns blocked since server start",
                         mob.getType().getDescriptionId(), (int) Math.floor(event.getX()), (int) Math.floor(event.getY()),
-                        (int) Math.floor(event.getZ()), emitter.getName().getString());
+                        (int) Math.floor(event.getZ()), emitter.getName().getString(), total);
             }
         }
     }
@@ -101,18 +98,5 @@ public final class SpawnBlocker {
             });
             return lit;
         });
-    }
-
-    @SubscribeEvent
-    static void onRegisterCommands(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("beamlightsspawns")
-                .requires(src -> src.hasPermission(2))
-                .executes(ctx -> {
-                    long n = BLOCKED.get();
-                    boolean on = BeamServerConfig.BLOCK_SPAWNS_IN_BEAM.get();
-                    ctx.getSource().sendSuccess(() -> Component.literal("Beam Lights: " + n
-                            + " natural monster spawns blocked since server start, blocking enabled: " + on), false);
-                    return (int) Math.min(n, Integer.MAX_VALUE);
-                }));
     }
 }

@@ -33,4 +33,28 @@ class AttractTargetTest {
         assertTrue(AttractTarget.arrived(new V3(1, 0, 1), new V3(0, 0, 0), 1.5));
         assertFalse(AttractTarget.arrived(new V3(2, 0, 0), new V3(0, 0, 0), 1.5));
     }
+
+    @Test
+    void stepReturnsPointWhenClose() {
+        V3 p = new V3(3, 64, 4);
+        assertEquals(p, AttractTarget.step(new V3(0, 64, 0), p, 5.0));
+        assertEquals(p, AttractTarget.step(p, p, 5.0));
+    }
+
+    @Test
+    void stepClampsToMaxDistance() {
+        V3 s = AttractTarget.step(new V3(0, 64, 0), new V3(30, 64, 40), 5.0);
+        assertEquals(3.0, s.x(), 1e-9);
+        assertEquals(64.0, s.y(), 1e-9);
+        assertEquals(4.0, s.z(), 1e-9);
+        assertEquals(25.0, s.distSq(new V3(0, 64, 0)), 1e-9);
+    }
+
+    @Test
+    void rollHonoursChance() {
+        assertTrue(AttractTarget.roll(0.35, 0.1));
+        assertFalse(AttractTarget.roll(0.35, 0.35));
+        assertFalse(AttractTarget.roll(0.0, 0.0));
+        assertTrue(AttractTarget.roll(1.0, 0.999));
+    }
 }
