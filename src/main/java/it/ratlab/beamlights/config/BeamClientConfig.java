@@ -48,6 +48,19 @@ public final class BeamClientConfig {
             .comment("Max lights per ray (hit point + midpoints).")
             .defineInRange("maxSourcesPerBeam", 6, 1, 16);
 
+    public static final ModConfigSpec.IntValue RAYS = B
+            .comment("1 = central ray only, 4 = central + 3 rays inside the cone; other values act as 1.")
+            .defineInRange("rays", 4, 1, 4);
+    public static final ModConfigSpec.DoubleValue CONE_SPREAD = B
+            .comment("Side ray tilt as a fraction of the beam half-angle.")
+            .defineInRange("coneSpread", 0.6, 0.0, 1.0);
+    public static final ModConfigSpec.IntValue SIDE_LUMINANCE_OFFSET = B
+            .comment("Side ray light level relative to the beam (negative = dimmer).")
+            .defineInRange("sideLuminanceOffset", -2, -15, 0);
+    public static final ModConfigSpec.BooleanValue SIDE_MIDPOINTS = B
+            .comment("Add midpoints along the side rays too.")
+            .define("sideMidpoints", false);
+
     public static final ModConfigSpec.DoubleValue MOVE_THRESHOLD = B
             .comment("A light moves only when its target is at least this far (blocks). Each move rebuilds chunks.")
             .defineInRange("moveThreshold", 0.25, 0.0, 4.0);

@@ -5,6 +5,7 @@ import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.math.V3;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -83,5 +84,42 @@ class LightPointPlannerTest {
     void midLuminanceNeverBelowOne() {
         LightPointPlanner.Plan plan = LightPointPlanner.plan(O, DIR, miss(7), 3, settings(true, 6), ALWAYS_NEAR);
         assertEquals(1, plan.points().get(0).luminance());
+    }
+
+    @Test
+    void sideHitMergedAgainstSharedPoint() {
+        List<V3> shared = new ArrayList<>(List.of(O.add(DIR.scale(18.5))));
+        LightPointPlanner.Plan plan = LightPointPlanner.plan(O, DIR, hitAt(20), 12, settings(false, 6), ALWAYS_NEAR,
+                shared, true);
+        assertEquals(Status.MERGED, plan.points().get(0).status());
+        assertEquals(1, shared.size());
+    }
+
+    @Test
+    void sideHitAcceptedWhenFarAndAppended() {
+        List<V3> shared = new ArrayList<>(List.of(O.add(DIR.scale(5))));
+        LightPointPlanner.Plan plan = LightPointPlanner.plan(O, DIR, hitAt(20), 12, settings(false, 6), ALWAYS_NEAR,
+                shared, true);
+        assertEquals(Status.ACCEPTED, plan.points().get(0).status());
+        assertEquals(2, shared.size());
+    }
+
+    @Test
+    void hitNotMergedWithoutMergeHit() {
+        List<V3> shared = new ArrayList<>(List.of(O.add(DIR.scale(19.5))));
+        LightPointPlanner.Plan plan = LightPointPlanner.plan(O, DIR, hitAt(20), 12, settings(false, 6), ALWAYS_NEAR,
+                shared, false);
+        assertEquals(Status.ACCEPTED, plan.points().get(0).status());
+    }
+
+    @Test
+    void capIgnoresSharedPoints() {
+        List<V3> shared = new ArrayList<>();
+        for (int i = 0; i < 10; i++) shared.add(new V3(0, 200 + i * 10, 0));
+        LightPointPlanner.Plan plan = LightPointPlanner.plan(O, DIR, miss(30), 14, settings(true, 2), ALWAYS_NEAR,
+                shared, true);
+        assertEquals(2, plan.accepted().size());
+        assertEquals(2, plan.count(Status.CAPPED));
+        assertEquals(12, shared.size());
     }
 }

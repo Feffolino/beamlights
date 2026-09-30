@@ -37,31 +37,47 @@ public final class LightPointPlanner {
 
     public static Plan plan(V3 origin, V3 direction, BeamTracer.Result trace, int luminance, Settings s,
                             OccluderProbe probe) {
+        return plan(origin, direction, trace, luminance, s, probe, new ArrayList<>(), false);
+    }
+
+    /**
+     * Cross-ray variant: points are merge-checked against and appended to {@code sharedAccepted}. With
+     * {@code mergeHit} the hit point is merge-checked too. maxPerBeam counts only this ray's points.
+     */
+    public static Plan plan(V3 origin, V3 direction, BeamTracer.Result trace, int luminance, Settings s,
+                            OccluderProbe probe, List<V3> sharedAccepted, boolean mergeHit) {
         List<PlannedPoint> out = new ArrayList<>();
         if (luminance <= 0) return new Plan(out);
         V3 dir = direction.normalize();
-        List<V3> accepted = new ArrayList<>();
+        double mergeSq = s.mergeDistance() * s.mergeDistance();
+        int own = 0;
 
         if (trace.hit()) {
             V3 p = origin.add(dir.scale(Math.max(0, trace.distance() - s.hitBackoff())));
-            Status st = s.maxPerBeam() < 1 ? Status.CAPPED : Status.ACCEPTED;
-            if (st == Status.ACCEPTED) accepted.add(p);
+            Status st;
+            if (mergeHit && isNear(sharedAccepted, p, mergeSq)) st = Status.MERGED;
+            else if (s.maxPerBeam() < 1) st = Status.CAPPED;
+            else {
+                st = Status.ACCEPTED;
+                sharedAccepted.add(p);
+                own++;
+            }
             out.add(new PlannedPoint(0, p, luminance, st));
         }
 
         if (s.midpoints() && s.midSpacing() > 0) {
             int midLum = Math.max(1, Math.min(15, luminance + s.midLuminanceOffset()));
-            double mergeSq = s.mergeDistance() * s.mergeDistance();
             int slot = 1;
             for (double d = s.midSpacing(); d < trace.distance() && slot < 256; d += s.midSpacing(), slot++) {
                 V3 p = origin.add(dir.scale(d));
                 Status st;
-                if (isNear(accepted, p, mergeSq)) st = Status.MERGED;
+                if (isNear(sharedAccepted, p, mergeSq)) st = Status.MERGED;
                 else if (!probe.nearOccluder(p)) st = Status.SKIPPED_AIR;
-                else if (accepted.size() >= s.maxPerBeam()) st = Status.CAPPED;
+                else if (own >= s.maxPerBeam()) st = Status.CAPPED;
                 else {
                     st = Status.ACCEPTED;
-                    accepted.add(p);
+                    sharedAccepted.add(p);
+                    own++;
                 }
                 out.add(new PlannedPoint(slot, p, midLum, st));
             }

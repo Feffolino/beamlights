@@ -56,8 +56,9 @@ public final class DebugRender {
         for (TracedBeam tb : frame) {
             V3 origin = tb.beam().origin();
             V3 end = tb.trace().point();
-            line(ps, lines, cam, origin, end, 1f, 1f, 1f, 1f);
-            if (tb.trace().hit()) {
+            float c = tb.side() ? 0.6f : 1f;
+            line(ps, lines, cam, origin, end, c, c, c, 1f);
+            if (tb.trace().hit() && !tb.side()) {
                 V3 rangeEnd = origin.add(tb.beam().dir().normalize().scale(tb.beam().range()));
                 line(ps, lines, cam, end, rangeEnd, 1f, 0.2f, 0.2f, 0.6f);
             }

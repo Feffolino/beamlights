@@ -9,10 +9,12 @@ import it.ratlab.beamlights.client.debug.TracedBeam;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
+import it.ratlab.beamlights.core.ConeRays;
 import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
+import it.ratlab.beamlights.core.math.V3;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -131,6 +133,12 @@ public final class BeamClientTicker {
                 BeamClientConfig.MIDPOINTS.get(), BeamClientConfig.MID_SPACING.get(),
                 BeamClientConfig.MID_LUMINANCE_OFFSET.get(), BeamClientConfig.MAX_SOURCES_PER_BEAM.get(),
                 BeamClientConfig.MERGE_DISTANCE.get(), HIT_BACKOFF);
+        LightPointPlanner.Settings sideSettings = new LightPointPlanner.Settings(
+                BeamClientConfig.SIDE_MIDPOINTS.get(), settings.midSpacing(), settings.midLuminanceOffset(),
+                settings.maxPerBeam(), settings.mergeDistance(), HIT_BACKOFF);
+        int rays = BeamClientConfig.RAYS.get();
+        double coneSpread = BeamClientConfig.CONE_SPREAD.get();
+        int sideOffset = BeamClientConfig.SIDE_LUMINANCE_OFFSET.get();
         LevelOcclusion occlusion = new LevelOcclusion(level);
 
         List<Entity> emitters = new ArrayList<>();
@@ -147,26 +155,40 @@ public final class BeamClientTicker {
         b.begin();
         int used = 0;
         List<Beam> beams = new ArrayList<>();
+        List<V3> shared = new ArrayList<>();
         for (Entity e : emitters) {
             beams.clear();
+            shared.clear();
             BeamRegistry.INSTANCE.collect(e, 1.0f, beams::add);
-            for (int ray = 0; ray < beams.size(); ray++) {
-                Beam beam = beams.get(ray);
-                BeamTracer.Result trace = BeamTracer.trace(beam.origin(), beam.dir(), beam.range(), occlusion);
-                LightPointPlanner.Plan plan = LightPointPlanner.plan(beam.origin(), beam.dir(), trace, beam.luminance(),
-                        settings, occlusion);
-                STATS.addPlan(plan);
-                for (PlannedPoint p : plan.points()) {
-                    if (p.status() != Status.ACCEPTED) continue;
-                    if (used >= maxSources) {
-                        STATS.globalCapped++;
-                        continue;
+            for (int bi = 0; bi < beams.size(); bi++) {
+                Beam beam = beams.get(bi);
+                List<V3> dirs = ConeRays.directions(beam.dir(), beam.coneDeg(), coneSpread, rays);
+                for (int sub = 0; sub < dirs.size(); sub++) {
+                    boolean side = sub > 0;
+                    int lum = side ? Math.max(0, Math.min(15, beam.luminance() + sideOffset)) : beam.luminance();
+                    if (lum <= 0) continue;
+                    // Ray index for Keys: 4 sub-rays per beam, fits 8 bits for up to 64 beams per entity.
+                    int ray = bi * 4 + sub;
+                    Beam rayBeam = side
+                            ? new Beam(beam.origin(), dirs.get(sub), beam.range(), beam.coneDeg(), lum, beam.rgb())
+                            : beam;
+                    BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(), occlusion);
+                    LightPointPlanner.Plan plan = LightPointPlanner.plan(rayBeam.origin(), rayBeam.dir(), trace, lum,
+                            side ? sideSettings : settings, occlusion, shared, side);
+                    STATS.addPlan(plan);
+                    for (PlannedPoint p : plan.points()) {
+                        if (p.status() != Status.ACCEPTED) continue;
+                        if (used >= maxSources) {
+                            STATS.globalCapped++;
+                            continue;
+                        }
+                        b.put(Keys.of(e.getId(), ray, p.slot()), p.pos(), p.luminance());
+                        used++;
                     }
-                    b.put(Keys.of(e.getId(), ray, p.slot()), p.pos(), p.luminance());
-                    used++;
-                }
-                if (frame != null) {
-                    frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), e.getId(), ray, beam, trace, plan));
+                    if (frame != null) {
+                        frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), e.getId(), ray, side,
+                                rayBeam, trace, plan));
+                    }
                 }
             }
         }
