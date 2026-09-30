@@ -36,6 +36,7 @@ public final class BeamClientTicker {
 
     private static LightBackend backend;
     private static ClientLevel lastLevel;
+    private static long lastErrorLogMs;
 
     private BeamClientTicker() {
     }
@@ -69,8 +70,17 @@ public final class BeamClientTicker {
         try {
             tick(level, player, backend());
         } catch (Throwable t) {
-            BeamLights.LOG.error("Beam Lights: backend '{}' failed, dynamic beam light disabled", backend().name(), t);
-            backend = new NoopBackend("failed: " + t);
+            LightBackend old = backend();
+            try {
+                old.clear();
+            } catch (Throwable ignored) {
+            }
+            if (permanent(t)) {
+                BeamLights.LOG.error("Beam Lights: backend '{}' failed, dynamic beam light disabled", old.name(), t);
+                backend = new NoopBackend("failed: " + t);
+            } else {
+                logRateLimited(old.name(), t);
+            }
             DebugState.setLastFrame(List.of());
         }
     }
@@ -86,9 +96,25 @@ public final class BeamClientTicker {
         try {
             backend.clear();
         } catch (Throwable t) {
-            BeamLights.LOG.warn("Beam Lights: backend clear failed", t);
-            backend = new NoopBackend("failed on clear: " + t);
+            if (permanent(t)) {
+                BeamLights.LOG.warn("Beam Lights: backend clear failed", t);
+                backend = new NoopBackend("failed on clear: " + t);
+            } else {
+                logRateLimited(backend.name(), t);
+            }
         }
+    }
+
+    /** API mismatch: retrying every tick is pointless. */
+    private static boolean permanent(Throwable t) {
+        return t instanceof LinkageError || t instanceof ClassCastException;
+    }
+
+    private static void logRateLimited(String backendName, Throwable t) {
+        long now = System.currentTimeMillis();
+        if (now - lastErrorLogMs < 10_000L) return;
+        lastErrorLogMs = now;
+        BeamLights.LOG.error("Beam Lights: backend '{}' tick failed, will retry", backendName, t);
     }
 
     private static void tick(ClientLevel level, LocalPlayer player, LightBackend b) {
@@ -109,11 +135,12 @@ public final class BeamClientTicker {
 
         List<Entity> emitters = new ArrayList<>();
         for (Entity e : level.entitiesForRendering()) {
+            if (!BeamRegistry.INSTANCE.mayEmit(e)) continue;
             if (e != player) {
                 if (!others && e instanceof Player) continue;
                 if (e.distanceToSqr(player) > rangeSq) continue;
             }
-            if (BeamRegistry.INSTANCE.mayEmit(e)) emitters.add(e);
+            emitters.add(e);
         }
         emitters.sort(Comparator.comparingDouble(e -> e == player ? -1.0 : e.distanceToSqr(player)));
 

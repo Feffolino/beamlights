@@ -1,5 +1,6 @@
 package it.ratlab.beamlights.client.debug;
 
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import it.ratlab.beamlights.BeamLights;
@@ -29,6 +30,8 @@ import java.util.List;
 public final class DebugRender {
     private static final double SDL_RADIUS = 7.75;
     private static final int CIRCLE_SEGMENTS = 32;
+    // Private buffer so labels never flush the shared buffer source.
+    private static final MultiBufferSource.BufferSource LABELS = MultiBufferSource.immediate(new ByteBufferBuilder(1536));
 
     private DebugRender() {
     }
@@ -83,10 +86,10 @@ public final class DebugRender {
         Font font = mc.font;
         for (TracedBeam tb : frame) {
             for (PlannedPoint p : tb.plan().points()) {
-                if (p.status() == Status.ACCEPTED) label(ps, buffers, font, camera, cam, p.pos(), String.valueOf(p.luminance()));
+                if (p.status() == Status.ACCEPTED) label(ps, LABELS, font, camera, cam, p.pos(), String.valueOf(p.luminance()));
             }
         }
-        buffers.endBatch();
+        LABELS.endBatch();
     }
 
     private static void line(PoseStack ps, VertexConsumer vc, Vec3 cam, V3 a, V3 b, float r, float g, float bl, float al) {

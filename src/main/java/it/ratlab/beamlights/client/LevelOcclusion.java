@@ -9,6 +9,7 @@ import net.minecraft.world.level.Level;
 /** Transparency rule of the spec: a block stops the beam when canOcclude(); everything else is passed through. */
 public final class LevelOcclusion implements BeamTracer.BlockTest, LightPointPlanner.OccluderProbe {
     private static final int PROBE_RADIUS = 4;
+    private static final int DOWN_RADIUS = 7;
     private static final int[][] AXES = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
 
     private final Level level;
@@ -31,6 +32,9 @@ public final class LevelOcclusion implements BeamTracer.BlockTest, LightPointPla
             for (int d = 1; d <= PROBE_RADIUS; d++) {
                 if (stops(bx + a[0] * d, by + a[1] * d, bz + a[2] * d)) return true;
             }
+        }
+        for (int d = PROBE_RADIUS + 1; d <= DOWN_RADIUS; d++) {
+            if (stops(bx, by - d, bz)) return true;
         }
         return false;
     }
