@@ -1,4 +1,4 @@
-package it.ratlab.beamlights.client;
+package it.ratlab.beamlights.world;
 
 import it.ratlab.beamlights.core.BeamTracer;
 import it.ratlab.beamlights.core.LightPointPlanner;

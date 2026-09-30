@@ -4,7 +4,10 @@ import net.minecraft.world.entity.Entity;
 
 import java.util.function.Consumer;
 
-/** Supplies beams emitted by entities. Called on the client thread every tick; keep it cheap. */
+/**
+ * Supplies beams emitted by entities; keep it cheap. Called every tick on the client thread (light) and on the server
+ * thread (spawn blocking): check entity.level().isClientSide() before touching client-only classes or the client config.
+ */
 public interface BeamProvider {
     /** Short id shown in debug output. */
     String name();

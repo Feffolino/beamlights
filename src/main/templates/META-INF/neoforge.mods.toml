@@ -8,7 +8,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="Rat Lab"
 credits="Thanks to the NeoForge, Sodium Dynamic Lights and Omega Flashlight authors."
-# Not required on the other side: phase 1 is client-only, later server features are optional.
+# Not required on the other side: client light and server spawn blocking each work alone.
 displayTest="IGNORE_ALL_VERSION"
 description='''
 Directional dynamic light for flashlights, helmet lamps and headlights: the beam lights the blocks it hits and the

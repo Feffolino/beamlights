@@ -15,6 +15,7 @@ import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.world.LevelOcclusion;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
