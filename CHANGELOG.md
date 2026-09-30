@@ -5,6 +5,9 @@
   transparency rule as the light) are cancelled via FinalizeSpawnEvent. Server config beamlights-server.toml
   (blockSpawnsInBeam, spawnCheckRange, debugLog), op command /beamlightsspawns. Omega provider is now server-safe and
   registered in common setup; LevelOcclusion moved to the common world package.
+- Optional mob attraction (server, off by default): hostile mobs without a target walk to the point a lit beam hits
+  (central ray only, checked every attractInterval ticks). Config keys beamAttractsMobs, attractRadius,
+  attractInterval, attractMaxMobs, attractSpeed, attractRepathDistance; op command /beamlightsattract.
 
 ## 0.2.0 (unreleased)
 - Phase 2: multi-ray cone (central ray + 3 side rays: down, up-right, up-left) with cross-ray merge; config keys
