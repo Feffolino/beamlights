@@ -1,3 +1,4 @@
 {
-  "key.categories.beamlights": "Beam Lights"
+  "key.categories.beamlights": "Beam Lights",
+  "key.beamlights.toggle_debug_render": "Toggle beam debug render"
 }
