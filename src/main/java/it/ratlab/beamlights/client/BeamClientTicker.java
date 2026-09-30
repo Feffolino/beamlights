@@ -14,6 +14,7 @@ import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
+import it.ratlab.beamlights.core.LightSmoother;
 import it.ratlab.beamlights.core.RayLayout;
 import it.ratlab.beamlights.core.RaySpec;
 import it.ratlab.beamlights.core.math.V3;
@@ -33,7 +34,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** Per tick: collect beams near the player, trace, plan light points, feed the backend. */
+/** Per tick: collect beams near the player, trace, plan light points, smooth them, feed the backend. */
 @EventBusSubscriber(modid = BeamLights.MOD_ID, value = Dist.CLIENT)
 public final class BeamClientTicker {
     public static final BeamStats STATS = new BeamStats();
@@ -43,6 +44,8 @@ public final class BeamClientTicker {
 
     private static LayoutKey layoutKey;
     private static List<RaySpec> cachedLayout = List.of();
+
+    private static final LightSmoother SMOOTHER = new LightSmoother();
 
     private static LightBackend backend;
     private static ClientLevel lastLevel;
@@ -81,6 +84,7 @@ public final class BeamClientTicker {
             tick(level, player, backend());
         } catch (Throwable t) {
             LightBackend old = backend();
+            SMOOTHER.clear();
             try {
                 old.clear();
             } catch (Throwable ignored) {
@@ -102,6 +106,7 @@ public final class BeamClientTicker {
     }
 
     private static void safeClear() {
+        SMOOTHER.clear();
         if (backend == null) return;
         try {
             backend.clear();
@@ -193,8 +198,7 @@ public final class BeamClientTicker {
         }
         emitters.sort(Comparator.comparingDouble(e -> e == player ? -1.0 : e.distanceToSqr(player)));
 
-        b.begin();
-        int used = 0;
+        List<LightSmoother.Target> targets = new ArrayList<>();
         List<Beam> beams = new ArrayList<>();
         List<V3> shared = new ArrayList<>();
         for (Entity e : emitters) {
@@ -233,12 +237,8 @@ public final class BeamClientTicker {
                                 STATS.capped++;
                                 continue;
                             }
-                            if (used >= maxSources) {
-                                STATS.globalCapped++;
-                                continue;
-                            }
-                            b.put(Keys.of(e.getId(), ray, p.slot()), p.pos(), p.luminance());
-                            used++;
+                            targets.add(new LightSmoother.Target(Keys.of(e.getId(), ray, p.slot()), p.pos(),
+                                    p.luminance()));
                             entityUsed++;
                         }
                         if (frame != null) {
@@ -248,6 +248,22 @@ public final class BeamClientTicker {
                     }
                 }
             }
+        }
+
+        // Global cap on the smoothed output; ghosts come last, so they are the first to go.
+        List<LightSmoother.Output> out = SMOOTHER.update(targets, new LightSmoother.Settings(
+                BeamClientConfig.SMOOTHING.get(), BeamClientConfig.SMOOTH_FACTOR.get(),
+                BeamClientConfig.JUMP_DISTANCE.get(), BeamClientConfig.FADE_TICKS.get()));
+        b.begin();
+        int used = 0;
+        for (LightSmoother.Output o : out) {
+            if (used >= maxSources) {
+                if (!o.ghost()) STATS.globalCapped++;
+                continue;
+            }
+            b.put(o.key(), o.pos(), o.luminance());
+            used++;
+            if (o.ghost()) STATS.ghosts++;
         }
         b.end();
 

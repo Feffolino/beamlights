@@ -68,7 +68,9 @@ public final class LightPointPlanner {
         if (s.midpoints() && s.midSpacing() > 0) {
             int midLum = Math.max(1, Math.min(15, luminance + s.midLuminanceOffset()));
             int slot = 1;
-            for (double d = s.midSpacing(); d < trace.distance() && slot < 256; d += s.midSpacing(), slot++) {
+            // Slots stay below the ghost bit of Keys.
+            for (double d = s.midSpacing(); d < trace.distance() && slot < Keys.GHOST_BIT;
+                 d += s.midSpacing(), slot++) {
                 V3 p = origin.add(dir.scale(d));
                 Status st;
                 if (isNear(sharedAccepted, p, mergeSq)) st = Status.MERGED;

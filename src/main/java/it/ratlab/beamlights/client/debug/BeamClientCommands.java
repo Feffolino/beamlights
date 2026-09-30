@@ -1,5 +1,7 @@
 package it.ratlab.beamlights.client.debug;
 
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import it.ratlab.beamlights.BeamLights;
@@ -17,12 +19,14 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 
 import java.util.function.Consumer;
 
 /**
- * Client command /beamlights: status, reload, debug, layout editing (client config, saved at once) and the server game
+ * Client command /beamlights: status, reload, debug, layout and smoothing editing (client config, saved at once) and
+ * the server game
  * rules. spawns|attract are forwarded to the vanilla /gamerule command, so the server checks op permission.
  */
 @EventBusSubscriber(modid = BeamLights.MOD_ID, value = Dist.CLIENT)
@@ -42,6 +46,7 @@ public final class BeamClientCommands {
                 .then(gamerule("spawns", BeamGameRules.BLOCK_SPAWNS_NAME))
                 .then(gamerule("attract", BeamGameRules.ATTRACT_MOBS_NAME))
                 .then(LayoutCommands.build())
+                .then(smoothing())
                 .then(Commands.literal("debug")
                         .then(toggle("overlay", DebugState::setOverlay))
                         .then(toggle("render", DebugState::setRender))
@@ -88,11 +93,49 @@ public final class BeamClientCommands {
                 }));
     }
 
+    private static LiteralArgumentBuilder<CommandSourceStack> smoothing() {
+        return Commands.literal("smoothing")
+                .executes(c -> {
+                    reply(c, "Smoothing: " + smoothingLine());
+                    return 1;
+                })
+                .then(Commands.literal("on").executes(c -> saved(c, BeamClientConfig.SMOOTHING, true, "smoothing")))
+                .then(Commands.literal("off").executes(c -> saved(c, BeamClientConfig.SMOOTHING, false, "smoothing")))
+                .then(Commands.literal("factor")
+                        .then(Commands.argument("v", DoubleArgumentType.doubleArg(0.1, 1.0))
+                                .executes(c -> saved(c, BeamClientConfig.SMOOTH_FACTOR,
+                                        DoubleArgumentType.getDouble(c, "v"), "smoothFactor"))))
+                .then(Commands.literal("jump")
+                        .then(Commands.argument("v", DoubleArgumentType.doubleArg(1.0, 16.0))
+                                .executes(c -> saved(c, BeamClientConfig.JUMP_DISTANCE,
+                                        DoubleArgumentType.getDouble(c, "v"), "jumpDistance"))))
+                .then(Commands.literal("fade")
+                        .then(Commands.argument("ticks", IntegerArgumentType.integer(1, 20))
+                                .executes(c -> saved(c, BeamClientConfig.FADE_TICKS,
+                                        IntegerArgumentType.getInteger(c, "ticks"), "fadeTicks"))));
+    }
+
+    // set() also updates the cached value, save() writes beamlights-client.toml; applied on the next tick.
+    private static <T> int saved(CommandContext<CommandSourceStack> c, ModConfigSpec.ConfigValue<T> v, T value,
+                                 String key) {
+        v.set(value);
+        v.save();
+        reply(c, key + " = " + value + " (saved)");
+        return 1;
+    }
+
+    private static String smoothingLine() {
+        return (BeamClientConfig.SMOOTHING.get() ? "on" : "off") + ", factor " + BeamClientConfig.SMOOTH_FACTOR.get()
+                + ", jump " + BeamClientConfig.JUMP_DISTANCE.get() + " blocks, fade "
+                + BeamClientConfig.FADE_TICKS.get() + " ticks";
+    }
+
     private static int status(CommandContext<CommandSourceStack> c) {
         LightBackend b = BeamClientTicker.backend();
         reply(c, "Backend: " + b.name() + " (" + b.statusLine() + ")");
         reply(c, "Sources: " + b.ownCount() + " own / " + (b.totalCount() < 0 ? "?" : b.totalCount()) + " engine total");
         reply(c, "Layout: " + BeamClientTicker.layoutLine() + " (/beamlights layout show)");
+        reply(c, "Smoothing: " + smoothingLine() + " (/beamlights smoothing ...)");
         reply(c, "Server game rules: " + BeamGameRules.BLOCK_SPAWNS_NAME + ", " + BeamGameRules.ATTRACT_MOBS_NAME
                 + " (/beamlights spawns|attract [on|off])");
         reply(c, "Providers: " + BeamRegistry.INSTANCE.providerNames()

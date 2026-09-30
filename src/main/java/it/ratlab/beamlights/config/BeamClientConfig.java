@@ -104,6 +104,22 @@ public final class BeamClientConfig {
             .comment("Lights closer than this (blocks) to an accepted light are dropped.")
             .defineInRange("mergeDistance", 3.0, 0.0, 16.0);
 
+    // Smoothing: glide small moves, crossfade jumps. Fades add a few chunk rebuilds only at the moment of a jump.
+    public static final ModConfigSpec.BooleanValue SMOOTHING = B
+            .comment("Smooth light movement: small moves glide, jumps crossfade (old spot fades out, new one fades in),",
+                    "new lights fade in and vanished lights fade out. Fades add a few chunk rebuilds only at the",
+                    "moment of a jump.")
+            .define("smoothing", true);
+    public static final ModConfigSpec.DoubleValue SMOOTH_FACTOR = B
+            .comment("Fraction of the remaining distance a light glides per tick (1 = no glide).")
+            .defineInRange("smoothFactor", 0.5, 0.1, 1.0);
+    public static final ModConfigSpec.DoubleValue JUMP_DISTANCE = B
+            .comment("A target this far (blocks) from the shown light is a jump: crossfade instead of glide.")
+            .defineInRange("jumpDistance", 3.0, 1.0, 16.0);
+    public static final ModConfigSpec.IntValue FADE_TICKS = B
+            .comment("Ticks for a light to fade in or out.")
+            .defineInRange("fadeTicks", 4, 1, 20);
+
     public static final ModConfigSpec.BooleanValue DEBUG_OVERLAY = B
             .comment("Show the debug text overlay (also /beamlights debug overlay on|off).")
             .define("debugOverlay", false);

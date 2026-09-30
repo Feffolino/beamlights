@@ -11,7 +11,7 @@ import java.util.Locale;
 
 /** Per-tick counters plus smoothed tick cost and moves per second. */
 public final class BeamStats {
-    public int beams, accepted, skippedAir, merged, capped, globalCapped;
+    public int beams, accepted, skippedAir, merged, capped, globalCapped, ghosts;
     /** Set by the ticker when the ray layout is rebuilt. */
     public String layout = "-";
     private double avgMicros;
@@ -20,7 +20,7 @@ public final class BeamStats {
     private int movesPerSecond;
 
     public void beginTick() {
-        beams = accepted = skippedAir = merged = capped = globalCapped = 0;
+        beams = accepted = skippedAir = merged = capped = globalCapped = ghosts = 0;
     }
 
     public void addPlan(LightPointPlanner.Plan plan) {
@@ -46,7 +46,8 @@ public final class BeamStats {
         int total = backend.totalCount();
         return List.of(
                 "[Beam Lights] backend: " + backend.name() + " (" + backend.statusLine() + ")",
-                "sources: " + backend.ownCount() + " own / " + (total < 0 ? "?" : total) + " engine total, max "
+                "sources: " + backend.ownCount() + " own (" + ghosts + " ghosts) / " + (total < 0 ? "?" : total)
+                        + " engine total, max "
                         + BeamClientConfig.MAX_SOURCES.get(),
                 "beams: " + beams + "  points: " + accepted + " ok, " + skippedAir + " air, " + merged + " merged, "
                         + capped + " capped, " + globalCapped + " over max",

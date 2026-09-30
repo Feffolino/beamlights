@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+- Smooth light movement (`core/LightSmoother`, between ticker and backend): small moves glide
+  (`smoothFactor`, default 0.5), jumps of at least `jumpDistance` (default 3) blocks crossfade (a ghost fades out at the
+  old spot while the light fades in at the new one), new lights fade in and vanished lights fade out over `fadeTicks`
+  (default 4). Master switch `smoothing` (default true). Ghost keys set slot bit 7; planner slots stay below 128.
+- `/beamlights smoothing [on|off]|factor <v>|jump <v>|fade <ticks>` (saved at once); `/beamlights status` shows the
+  smoothing settings and the overlay the ghost count. `maxSources` now caps the smoothed output (ghosts first to go).
+
 ## 0.5.0 (unreleased)
 - On/off switches are now game rules (per world): `beamlightsBlockSpawns` (SPAWNING, default true) and
   `beamlightsAttractMobs` (MOBS, default false). Config keys `blockSpawnsInBeam` and `beamAttractsMobs` removed.
