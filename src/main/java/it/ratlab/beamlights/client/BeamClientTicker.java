@@ -1,0 +1,152 @@
+package it.ratlab.beamlights.client;
+
+import it.ratlab.beamlights.BeamLights;
+import it.ratlab.beamlights.api.Beam;
+import it.ratlab.beamlights.client.debug.BeamStats;
+import it.ratlab.beamlights.client.debug.DebugDump;
+import it.ratlab.beamlights.client.debug.DebugState;
+import it.ratlab.beamlights.client.debug.TracedBeam;
+import it.ratlab.beamlights.config.BeamClientConfig;
+import it.ratlab.beamlights.core.BeamRegistry;
+import it.ratlab.beamlights.core.BeamTracer;
+import it.ratlab.beamlights.core.Keys;
+import it.ratlab.beamlights.core.LightPointPlanner;
+import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
+import it.ratlab.beamlights.core.LightPointPlanner.Status;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+/** Per tick: collect beams near the player, trace, plan light points, feed the backend. */
+@EventBusSubscriber(modid = BeamLights.MOD_ID, value = Dist.CLIENT)
+public final class BeamClientTicker {
+    public static final BeamStats STATS = new BeamStats();
+    private static final double HIT_BACKOFF = 0.5;
+
+    private static LightBackend backend;
+    private static ClientLevel lastLevel;
+
+    private BeamClientTicker() {
+    }
+
+    public static LightBackend backend() {
+        if (backend == null) backend = BackendFactory.create();
+        return backend;
+    }
+
+    /** Clears every light and re-creates the backend (used by /beamlights reload). */
+    public static void resetBackend() {
+        safeClear();
+        backend = BackendFactory.create();
+    }
+
+    @SubscribeEvent
+    static void onTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        ClientLevel level = mc.level;
+        LocalPlayer player = mc.player;
+        if (level == null || player == null || !BeamClientConfig.ENABLED.get()) {
+            if (lastLevel != null || !BeamClientConfig.ENABLED.get()) safeClear();
+            lastLevel = null;
+            DebugState.setLastFrame(List.of());
+            return;
+        }
+        if (level != lastLevel) {
+            safeClear();
+            lastLevel = level;
+        }
+        try {
+            tick(level, player, backend());
+        } catch (Throwable t) {
+            BeamLights.LOG.error("Beam Lights: backend '{}' failed, dynamic beam light disabled", backend().name(), t);
+            backend = new NoopBackend("failed: " + t);
+            DebugState.setLastFrame(List.of());
+        }
+    }
+
+    @SubscribeEvent
+    static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        safeClear();
+        lastLevel = null;
+    }
+
+    private static void safeClear() {
+        if (backend == null) return;
+        try {
+            backend.clear();
+        } catch (Throwable t) {
+            BeamLights.LOG.warn("Beam Lights: backend clear failed", t);
+            backend = new NoopBackend("failed on clear: " + t);
+        }
+    }
+
+    private static void tick(ClientLevel level, LocalPlayer player, LightBackend b) {
+        long t0 = System.nanoTime();
+        STATS.beginTick();
+        boolean capture = DebugState.overlay() || DebugState.render() || DebugState.dumpRequested();
+        List<TracedBeam> frame = capture ? new ArrayList<>() : null;
+
+        double range = BeamClientConfig.OTHER_PLAYERS_RANGE.get();
+        double rangeSq = range * range;
+        boolean others = BeamClientConfig.OTHER_PLAYERS.get();
+        int maxSources = BeamClientConfig.MAX_SOURCES.get();
+        LightPointPlanner.Settings settings = new LightPointPlanner.Settings(
+                BeamClientConfig.MIDPOINTS.get(), BeamClientConfig.MID_SPACING.get(),
+                BeamClientConfig.MID_LUMINANCE_OFFSET.get(), BeamClientConfig.MAX_SOURCES_PER_BEAM.get(),
+                BeamClientConfig.MERGE_DISTANCE.get(), HIT_BACKOFF);
+        LevelOcclusion occlusion = new LevelOcclusion(level);
+
+        List<Entity> emitters = new ArrayList<>();
+        for (Entity e : level.entitiesForRendering()) {
+            if (e != player) {
+                if (!others && e instanceof Player) continue;
+                if (e.distanceToSqr(player) > rangeSq) continue;
+            }
+            if (BeamRegistry.INSTANCE.mayEmit(e)) emitters.add(e);
+        }
+        emitters.sort(Comparator.comparingDouble(e -> e == player ? -1.0 : e.distanceToSqr(player)));
+
+        b.begin();
+        int used = 0;
+        List<Beam> beams = new ArrayList<>();
+        for (Entity e : emitters) {
+            beams.clear();
+            BeamRegistry.INSTANCE.collect(e, 1.0f, beams::add);
+            for (int ray = 0; ray < beams.size(); ray++) {
+                Beam beam = beams.get(ray);
+                BeamTracer.Result trace = BeamTracer.trace(beam.origin(), beam.dir(), beam.range(), occlusion);
+                LightPointPlanner.Plan plan = LightPointPlanner.plan(beam.origin(), beam.dir(), trace, beam.luminance(),
+                        settings, occlusion);
+                STATS.addPlan(plan);
+                for (PlannedPoint p : plan.points()) {
+                    if (p.status() != Status.ACCEPTED) continue;
+                    if (used >= maxSources) {
+                        STATS.globalCapped++;
+                        continue;
+                    }
+                    b.put(Keys.of(e.getId(), ray, p.slot()), p.pos(), p.luminance());
+                    used++;
+                }
+                if (frame != null) {
+                    frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), e.getId(), ray, beam, trace, plan));
+                }
+            }
+        }
+        b.end();
+
+        STATS.endTick(System.nanoTime() - t0, b.movesThisTick());
+        DebugState.setLastFrame(frame != null ? frame : List.of());
+        if (DebugState.consumeDump()) DebugDump.write(frame, b, player);
+    }
+}
