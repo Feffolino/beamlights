@@ -1,0 +1,91 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.147'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+        }
+        configureEach {
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    // Optional integrations, compile-only (never bundled, never on the dev-run classpath). Jars copied from the pack into
+    // libs/ (gitignored). Code touching them is only class-loaded after a ModList check.
+    compileOnly files('libs/sodiumdynamiclights-neoforge-1.0.10-1.21.1.jar')
+    compileOnly files('libs/omegaflashlight-1.6.6-1.21.1.jar')
+
+    // Unit tests cover the pure core package (no Minecraft classes).
+    testImplementation platform('org.junit:junit-bom:5.10.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat 'full'
+    }
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version            : minecraft_version,
+            minecraft_version_range      : minecraft_version_range,
+            neo_version                  : neo_version,
+            loader_version_range         : loader_version_range,
+            mod_id                       : mod_id,
+            mod_name                     : mod_name,
+            mod_license                  : mod_license,
+            mod_version                  : mod_version,
+            sdl_version_range            : sdl_version_range,
+            omegaflashlight_version_range: omegaflashlight_version_range,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar', Jar).configure {
+    from('LICENSE')
+}
