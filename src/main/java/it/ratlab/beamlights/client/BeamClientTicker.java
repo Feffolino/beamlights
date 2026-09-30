@@ -14,6 +14,8 @@ import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
+import it.ratlab.beamlights.core.RayLayout;
+import it.ratlab.beamlights.core.RaySpec;
 import it.ratlab.beamlights.core.math.V3;
 import it.ratlab.beamlights.world.LevelOcclusion;
 import net.minecraft.client.Minecraft;
@@ -36,6 +38,11 @@ import java.util.List;
 public final class BeamClientTicker {
     public static final BeamStats STATS = new BeamStats();
     private static final double HIT_BACKOFF = 0.5;
+    private static final int RAYS_PER_BEAM = 32;
+    private static final int MAX_BEAMS_PER_ENTITY = 256 / RAYS_PER_BEAM;
+
+    private static LayoutKey layoutKey;
+    private static List<RaySpec> cachedLayout = List.of();
 
     private static LightBackend backend;
     private static ClientLevel lastLevel;
@@ -120,6 +127,37 @@ public final class BeamClientTicker {
         BeamLights.LOG.error("Beam Lights: backend '{}' tick failed, will retry", backendName, t);
     }
 
+    /** Config values the ray layout depends on; the layout is rebuilt only when these change. */
+    private record LayoutKey(RayLayout.Pattern pattern, int sideRays, double spread, double rollOffset, int innerRays,
+                             double innerSpread, List<String> custom, int lumOffset, boolean midpoints,
+                             double rangeFactor) {
+    }
+
+    private static List<RaySpec> layout() {
+        LayoutKey k = new LayoutKey(BeamClientConfig.RAY_PATTERN.get(), BeamClientConfig.SIDE_RAYS.get(),
+                BeamClientConfig.CONE_SPREAD.get(), BeamClientConfig.RAY_ROLL_OFFSET.get(),
+                BeamClientConfig.INNER_RAYS.get(), BeamClientConfig.INNER_SPREAD.get(),
+                List.copyOf(BeamClientConfig.CUSTOM_RAYS.get()), BeamClientConfig.SIDE_LUMINANCE_OFFSET.get(),
+                BeamClientConfig.SIDE_MIDPOINTS.get(), BeamClientConfig.SIDE_RANGE_FACTOR.get());
+        if (!k.equals(layoutKey)) {
+            layoutKey = k;
+            cachedLayout = RayLayout.build(k.pattern(), k.sideRays(), k.spread(), k.rollOffset(), k.innerRays(),
+                    k.innerSpread(), k.custom(), k.lumOffset(), k.midpoints(), k.rangeFactor());
+            if (k.pattern() == RayLayout.Pattern.CUSTOM) {
+                int bad = RayLayout.invalidCount(k.custom());
+                if (bad > 0) BeamLights.LOG.warn("Beam Lights: {} invalid customRays entries skipped", bad);
+            }
+            STATS.layout = k.pattern() + ", " + cachedLayout.size() + " side rays";
+        }
+        return cachedLayout;
+    }
+
+    /** Short layout description for the overlay and /beamlights status. */
+    public static String layoutLine() {
+        layout();
+        return STATS.layout;
+    }
+
     private static void tick(ClientLevel level, LocalPlayer player, LightBackend b) {
         long t0 = System.nanoTime();
         STATS.beginTick();
@@ -134,12 +172,14 @@ public final class BeamClientTicker {
                 BeamClientConfig.MIDPOINTS.get(), BeamClientConfig.MID_SPACING.get(),
                 BeamClientConfig.MID_LUMINANCE_OFFSET.get(), BeamClientConfig.MAX_SOURCES_PER_BEAM.get(),
                 BeamClientConfig.MERGE_DISTANCE.get(), HIT_BACKOFF);
-        LightPointPlanner.Settings sideSettings = new LightPointPlanner.Settings(
-                BeamClientConfig.SIDE_MIDPOINTS.get(), settings.midSpacing(), settings.midLuminanceOffset(),
+        LightPointPlanner.Settings sideMid = new LightPointPlanner.Settings(
+                true, settings.midSpacing(), settings.midLuminanceOffset(),
                 settings.maxPerBeam(), settings.mergeDistance(), HIT_BACKOFF);
-        int rays = BeamClientConfig.RAYS.get();
-        double coneSpread = BeamClientConfig.CONE_SPREAD.get();
-        int sideOffset = BeamClientConfig.SIDE_LUMINANCE_OFFSET.get();
+        LightPointPlanner.Settings sideNoMid = new LightPointPlanner.Settings(
+                false, settings.midSpacing(), settings.midLuminanceOffset(),
+                settings.maxPerBeam(), settings.mergeDistance(), HIT_BACKOFF);
+        List<RaySpec> layout = layout();
+        int perEntity = BeamClientConfig.MAX_SOURCES_PER_ENTITY.get();
         LevelOcclusion occlusion = new LevelOcclusion(level);
 
         List<Entity> emitters = new ArrayList<>();
@@ -161,34 +201,50 @@ public final class BeamClientTicker {
             beams.clear();
             shared.clear();
             BeamRegistry.INSTANCE.collect(e, 1.0f, beams::add);
-            for (int bi = 0; bi < beams.size(); bi++) {
-                Beam beam = beams.get(bi);
-                List<V3> dirs = ConeRays.directions(beam.dir(), beam.coneDeg(), coneSpread, rays);
-                for (int sub = 0; sub < dirs.size(); sub++) {
-                    boolean side = sub > 0;
-                    int lum = side ? Math.max(0, Math.min(15, beam.luminance() + sideOffset)) : beam.luminance();
-                    if (lum <= 0) continue;
-                    // Ray index for Keys: 4 sub-rays per beam, fits 8 bits for up to 64 beams per entity.
-                    int ray = bi * 4 + sub;
-                    Beam rayBeam = side
-                            ? new Beam(beam.origin(), dirs.get(sub), beam.range(), beam.coneDeg(), lum, beam.rgb())
-                            : beam;
-                    BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(), occlusion);
-                    LightPointPlanner.Plan plan = LightPointPlanner.plan(rayBeam.origin(), rayBeam.dir(), trace, lum,
-                            side ? sideSettings : settings, occlusion, shared, side);
-                    STATS.addPlan(plan);
-                    for (PlannedPoint p : plan.points()) {
-                        if (p.status() != Status.ACCEPTED) continue;
-                        if (used >= maxSources) {
-                            STATS.globalCapped++;
-                            continue;
+            // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
+            int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
+            int entityUsed = 0;
+            // Pass 0: central rays of every beam, so they win the per-entity budget; pass 1: side rays.
+            for (int pass = 0; pass < 2; pass++) {
+                for (int bi = 0; bi < beamCount; bi++) {
+                    Beam beam = beams.get(bi);
+                    List<V3> dirs = pass == 0 ? List.of(beam.dir().normalize())
+                            : ConeRays.directions(beam.dir(), beam.coneDeg(), layout);
+                    for (int i = 0; i < dirs.size(); i++) {
+                        boolean side = pass == 1;
+                        RaySpec spec = side ? layout.get(i) : null;
+                        int lum = side ? Math.max(0, Math.min(15, beam.luminance() + spec.luminanceOffset()))
+                                : beam.luminance();
+                        if (lum <= 0) continue;
+                        int ray = bi * RAYS_PER_BEAM + (side ? i + 1 : 0);
+                        Beam rayBeam = side
+                                ? new Beam(beam.origin(), dirs.get(i), (float) (beam.range() * spec.rangeFactor()),
+                                beam.coneDeg(), lum, beam.rgb())
+                                : beam;
+                        BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(),
+                                occlusion);
+                        LightPointPlanner.Settings s = !side ? settings : spec.midpoints() ? sideMid : sideNoMid;
+                        LightPointPlanner.Plan plan = LightPointPlanner.plan(rayBeam.origin(), rayBeam.dir(), trace,
+                                lum, s, occlusion, shared, side);
+                        STATS.addPlan(plan);
+                        for (PlannedPoint p : plan.points()) {
+                            if (p.status() != Status.ACCEPTED) continue;
+                            if (entityUsed >= perEntity) {
+                                STATS.capped++;
+                                continue;
+                            }
+                            if (used >= maxSources) {
+                                STATS.globalCapped++;
+                                continue;
+                            }
+                            b.put(Keys.of(e.getId(), ray, p.slot()), p.pos(), p.luminance());
+                            used++;
+                            entityUsed++;
                         }
-                        b.put(Keys.of(e.getId(), ray, p.slot()), p.pos(), p.luminance());
-                        used++;
-                    }
-                    if (frame != null) {
-                        frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), e.getId(), ray, side,
-                                rayBeam, trace, plan));
+                        if (frame != null) {
+                            frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), e.getId(), ray, side,
+                                    rayBeam, trace, plan));
+                        }
                     }
                 }
             }

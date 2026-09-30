@@ -66,6 +66,7 @@ public final class BeamClientCommands {
         LightBackend b = BeamClientTicker.backend();
         reply(c, "Backend: " + b.name() + " (" + b.statusLine() + ")");
         reply(c, "Sources: " + b.ownCount() + " own / " + (b.totalCount() < 0 ? "?" : b.totalCount()) + " engine total");
+        reply(c, "Layout: " + BeamClientTicker.layoutLine());
         reply(c, "Providers: " + BeamRegistry.INSTANCE.providerNames()
                 + ", Omega Flashlight loaded: " + ModList.get().isLoaded("omegaflashlight"));
         return 1;

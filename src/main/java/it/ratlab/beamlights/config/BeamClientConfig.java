@@ -1,6 +1,9 @@
 package it.ratlab.beamlights.config;
 
+import it.ratlab.beamlights.core.RayLayout;
 import net.neoforged.neoforge.common.ModConfigSpec;
+
+import java.util.List;
 
 /** Client config, file beamlights-client.toml. */
 public final class BeamClientConfig {
@@ -48,11 +51,38 @@ public final class BeamClientConfig {
             .comment("Max lights per ray (hit point + midpoints).")
             .defineInRange("maxSourcesPerBeam", 6, 1, 16);
 
-    public static final ModConfigSpec.IntValue RAYS = B
-            .comment("1 = central ray only, 4 = central + 3 rays inside the cone; other values act as 1.")
-            .defineInRange("rays", 4, 1, 4);
+    // Ray layout: the central ray is always traced; side rays come from rayPattern (max 24).
+    public static final ModConfigSpec.EnumValue<RayLayout.Pattern> RAY_PATTERN = B
+            .comment("Ray layout. The central ray is always traced; this picks the side rays inside the cone:",
+                    "CENTER_ONLY = none; TRIANGLE = 3 (down, up-right, up-left with rayRollOffset 270);",
+                    "CROSS = 4; RING = sideRays evenly spaced; DOUBLE_RING = innerRays at innerSpread + sideRays",
+                    "at coneSpread; FAN_HORIZONTAL / FAN_VERTICAL = sideRays along a line (wide sweep);",
+                    "CUSTOM = customRays. At most 24 side rays. More rays cost more chunk rebuilds while moving",
+                    "(see moves/s in the debug overlay).")
+            .defineEnum("rayPattern", RayLayout.Pattern.TRIANGLE);
+    public static final ModConfigSpec.IntValue SIDE_RAYS = B
+            .comment("Side ray count for RING, the outer ring of DOUBLE_RING and the FAN patterns.")
+            .defineInRange("sideRays", 6, 1, RayLayout.MAX_SIDE_RAYS);
+    public static final ModConfigSpec.DoubleValue RAY_ROLL_OFFSET = B
+            .comment("Roll (degrees) of the first side ray around the beam axis: 0 = right, 90 = up, 270 = down,",
+                    "counter-clockwise. Ignored by the FAN patterns.")
+            .defineInRange("rayRollOffset", 270.0, 0.0, 360.0);
+    public static final ModConfigSpec.IntValue INNER_RAYS = B
+            .comment("Inner ring ray count for DOUBLE_RING (offset by half a step from the outer ring).")
+            .defineInRange("innerRays", 3, 1, 12);
+    public static final ModConfigSpec.DoubleValue INNER_SPREAD = B
+            .comment("Inner ring tilt for DOUBLE_RING as a fraction of the beam half-angle.")
+            .defineInRange("innerSpread", 0.3, 0.0, 1.0);
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> CUSTOM_RAYS = B
+            .comment("Side rays for CUSTOM, one entry per ray: \"spread,roll[,lumOffset[,midpoints[,rangeFactor]]]\".",
+                    "spread 0..1 (fraction of the half-angle), roll in degrees (0 = right, 90 = up, 270 = down),",
+                    "lumOffset -15..15, midpoints true|false, rangeFactor 0.1..1. Missing fields use",
+                    "sideLuminanceOffset, sideMidpoints and sideRangeFactor. Invalid entries are skipped (logged).",
+                    "Example: \"0.9,0,-4,false,0.8\".")
+            .defineListAllowEmpty("customRays", List.of("0.6,270", "0.6,30", "0.6,150"), () -> "0.6,270",
+                    o -> o instanceof String);
     public static final ModConfigSpec.DoubleValue CONE_SPREAD = B
-            .comment("Side ray tilt as a fraction of the beam half-angle.")
+            .comment("Side ray tilt as a fraction of the beam half-angle (outer ring and fan maximum).")
             .defineInRange("coneSpread", 0.6, 0.0, 1.0);
     public static final ModConfigSpec.IntValue SIDE_LUMINANCE_OFFSET = B
             .comment("Side ray light level relative to the beam (negative = dimmer).")
@@ -60,6 +90,12 @@ public final class BeamClientConfig {
     public static final ModConfigSpec.BooleanValue SIDE_MIDPOINTS = B
             .comment("Add midpoints along the side rays too.")
             .define("sideMidpoints", false);
+    public static final ModConfigSpec.DoubleValue SIDE_RANGE_FACTOR = B
+            .comment("Side ray range as a fraction of the beam range.")
+            .defineInRange("sideRangeFactor", 1.0, 0.1, 1.0);
+    public static final ModConfigSpec.IntValue MAX_SOURCES_PER_ENTITY = B
+            .comment("Max lights for all rays of one emitter; central ray points are placed first.")
+            .defineInRange("maxSourcesPerEntity", 16, 1, 64);
 
     public static final ModConfigSpec.DoubleValue MOVE_THRESHOLD = B
             .comment("A light moves only when its target is at least this far (blocks). Each move rebuilds chunks.")

@@ -12,6 +12,8 @@ import java.util.Locale;
 /** Per-tick counters plus smoothed tick cost and moves per second. */
 public final class BeamStats {
     public int beams, accepted, skippedAir, merged, capped, globalCapped;
+    /** Set by the ticker when the ray layout is rebuilt. */
+    public String layout = "-";
     private double avgMicros;
     private int movesWindow;
     private long windowStart;
@@ -49,6 +51,7 @@ public final class BeamStats {
                 "beams: " + beams + "  points: " + accepted + " ok, " + skippedAir + " air, " + merged + " merged, "
                         + capped + " capped, " + globalCapped + " over max",
                 String.format(Locale.ROOT, "moves/s: %d  tick: %.1f us", movesPerSecond, avgMicros),
+                "layout: " + layout,
                 "providers: " + BeamRegistry.INSTANCE.providerNames());
     }
 }

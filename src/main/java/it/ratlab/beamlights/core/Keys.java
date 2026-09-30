@@ -1,6 +1,9 @@
 package it.ratlab.beamlights.core;
 
-/** Stable light-source key: entity id (high bits), ray index (8 bits), slot (8 bits; 0 = hit, 1..n = midpoints). */
+/**
+ * Stable light-source key: entity id (high bits), ray index (8 bits), slot (8 bits; 0 = hit, 1..n = midpoints).
+ * The client uses ray = beamIndex * 32 + subRay (sub 0 = central, 1..24 side rays), so up to 8 beams per entity.
+ */
 public final class Keys {
     private Keys() {
     }
