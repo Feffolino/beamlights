@@ -14,6 +14,9 @@ import java.util.Set;
  * Sits between the ticker and the backend and softens light movement: small moves glide (lerp), jumps crossfade (a
  * ghost fades out at the old spot while the light ramps up at the new one), new lights ramp up and vanished lights
  * fade out. Ghosts use Keys.ghost(key), at most one per key. Client thread only.
+ * <p>
+ * Every output change costs the backend chunk rebuilds, so: a glide changes a light at most once every glideMinTicks
+ * (with snap only a block change counts as a change), and fades use at most fadeSteps distinct levels.
  */
 public final class LightSmoother {
     public record Target(long key, V3 pos, int luminance) {
@@ -22,7 +25,17 @@ public final class LightSmoother {
     public record Output(long key, V3 pos, int luminance, boolean ghost) {
     }
 
-    public record Settings(boolean enabled, double smoothFactor, double jumpDistance, int fadeTicks) {
+    /**
+     * fadeSteps = distinct luminance levels of a fade (0 = one per tick, the 0.8.1 behaviour); glideMinTicks = min
+     * ticks between two glide changes of one light; snap = backend snaps to block centers (glide changes counted per
+     * block).
+     */
+    public record Settings(boolean enabled, double smoothFactor, double jumpDistance, int fadeTicks, int fadeSteps,
+                           int glideMinTicks, boolean snap) {
+        /** The 0.8.1 behaviour: linear fades, a glide step every tick. */
+        public Settings(boolean enabled, double smoothFactor, double jumpDistance, int fadeTicks) {
+            this(enabled, smoothFactor, jumpDistance, fadeTicks, 0, 1, false);
+        }
     }
 
     static final double SNAP_DISTANCE = 0.05;
@@ -32,6 +45,8 @@ public final class LightSmoother {
         int lum;
         /** Ramp-up tick (1..fadeTicks), 0 when not ramping. */
         int ramp;
+        /** Ticks since the last glide change. */
+        int sinceGlide = Integer.MAX_VALUE / 2;
     }
 
     private static final class Ghost {
@@ -60,6 +75,8 @@ public final class LightSmoother {
             return out;
         }
         int fade = Math.max(1, s.fadeTicks());
+        int steps = s.fadeSteps();
+        int glideMin = Math.max(1, s.glideMinTicks());
         int lumStep = (15 + fade - 1) / fade;
         double jumpSq = s.jumpDistance() * s.jumpDistance();
         targeted.clear();
@@ -72,16 +89,21 @@ public final class LightSmoother {
             if (l == null) {
                 l = new Live();
                 live.put(t.key(), l);
-                startRamp(l, t, fade);
+                startRamp(l, t, fade, steps);
             } else if (l.pos.distSq(t.pos()) >= jumpSq) {
-                spawnGhost(t.key(), l, fade, fresh);
-                startRamp(l, t, fade);
+                spawnGhost(t.key(), l, fade, steps, fresh);
+                startRamp(l, t, fade, steps);
             } else {
-                V3 p = l.pos.add(t.pos().sub(l.pos).scale(s.smoothFactor()));
-                l.pos = p.distSq(t.pos()) < SNAP_DISTANCE * SNAP_DISTANCE ? t.pos() : p;
+                if (l.sinceGlide < Integer.MAX_VALUE / 2) l.sinceGlide++;
+                if (l.sinceGlide >= glideMin) {
+                    V3 p = l.pos.add(t.pos().sub(l.pos).scale(s.smoothFactor()));
+                    p = p.distSq(t.pos()) < SNAP_DISTANCE * SNAP_DISTANCE ? t.pos() : p;
+                    if (changed(l.pos, p, s.snap())) l.sinceGlide = 0;
+                    l.pos = p;
+                }
                 if (l.ramp > 0 && l.ramp < fade) {
                     l.ramp++;
-                    l.lum = rampLum(t.luminance(), l.ramp, fade);
+                    l.lum = rampLum(t.luminance(), l.ramp, fade, steps);
                 } else {
                     l.ramp = 0;
                     l.lum += Math.max(-lumStep, Math.min(lumStep, t.luminance() - l.lum));
@@ -94,7 +116,7 @@ public final class LightSmoother {
         while (it.hasNext()) {
             Map.Entry<Long, Live> e = it.next();
             if (targeted.contains(e.getKey())) continue;
-            spawnGhost(e.getKey(), e.getValue(), fade, fresh);
+            spawnGhost(e.getKey(), e.getValue(), fade, steps, fresh);
             it.remove();
         }
 
@@ -104,7 +126,7 @@ public final class LightSmoother {
             Ghost g = e.getValue();
             if (!fresh.contains(e.getKey())) {
                 g.tick++;
-                g.lum = fadeLum(g.startLum, g.tick, fade);
+                g.lum = fadeLum(g.startLum, g.tick, fade, steps);
             }
             if (g.lum <= 0) {
                 git.remove();
@@ -124,20 +146,47 @@ public final class LightSmoother {
         return ghosts.size();
     }
 
-    private void spawnGhost(long key, Live l, int fade, Set<Long> fresh) {
+    private void spawnGhost(long key, Live l, int fade, int steps, Set<Long> fresh) {
         long gk = Keys.ghost(key);
         Ghost g = new Ghost(l.pos, l.lum);
         g.tick = 1;
-        g.lum = fadeLum(l.lum, 1, fade);
+        g.lum = fadeLum(l.lum, 1, fade, steps);
         // Replaces an older ghost of the same key at once.
         ghosts.put(gk, g);
         fresh.add(gk);
     }
 
-    private static void startRamp(Live l, Target t, int fade) {
+    private static void startRamp(Live l, Target t, int fade, int steps) {
         l.pos = t.pos();
         l.ramp = fade > 1 ? 1 : 0;
-        l.lum = rampLum(t.luminance(), 1, fade);
+        l.lum = rampLum(t.luminance(), 1, fade, steps);
+        l.sinceGlide = 0;
+    }
+
+    /** True when the shown position changes: with snap only a block change counts. */
+    static boolean changed(V3 a, V3 b, boolean snap) {
+        if (snap) return !SourceMotion.snapToBlock(a).equals(SourceMotion.snapToBlock(b));
+        return !a.equals(b);
+    }
+
+    private static boolean linear(int fade, int steps) {
+        return steps <= 0 || steps >= fade;
+    }
+
+    /** Ramp quantized to at most steps levels over fade ticks (0 or steps >= fade = linear). */
+    static int rampLum(int target, int tick, int fade, int steps) {
+        if (linear(fade, steps)) return rampLum(target, tick, fade);
+        if (target <= 0) return 0;
+        int k = (Math.min(tick, fade) * steps + fade - 1) / fade;
+        return Math.max(1, (int) Math.round(target * (double) k / steps));
+    }
+
+    /** Fade quantized to at most steps levels (the first step already below start), 0 from tick fade on. */
+    static int fadeLum(int start, int tick, int fade, int steps) {
+        if (linear(fade, steps)) return fadeLum(start, tick, fade);
+        if (tick >= fade) return 0;
+        int k = ((fade - tick) * steps) / fade;
+        return (int) Math.round(start * (double) k / steps);
     }
 
     /** Linear ramp from 0 to target over fade ticks, at least 1 while the target is lit. */

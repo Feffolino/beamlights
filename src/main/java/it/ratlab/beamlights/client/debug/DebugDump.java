@@ -21,7 +21,10 @@ public final class DebugDump {
         List<TracedBeam> beams = frame == null ? List.of() : frame;
         BeamLights.LOG.info("[beamlights dump] backend={} ({}) own={} total={} beams={}", backend.name(),
                 backend.statusLine(), backend.ownCount(), backend.totalCount(), beams.size());
+        BeamLights.LOG.info("[beamlights dump] changes this tick: {} applied, {} deferred (moved = applied this tick)",
+                backend.movesThisTick(), backend.deferredThisTick());
         int accepted = 0;
+        int movedPoints = 0;
         for (TracedBeam tb : beams) {
             BeamLights.LOG.info("[beamlights dump]  owner={} source={} ray={} side={} origin={} dir={} range={} cone={} lum={} hit={} dist={}",
                     tb.owner(), tb.source(), tb.ray(), tb.side(), fmt(tb.beam().origin()), fmt(tb.beam().dir().normalize()),
@@ -30,13 +33,17 @@ public final class DebugDump {
             for (PlannedPoint p : tb.plan().points()) {
                 boolean ok = p.status() == Status.ACCEPTED;
                 if (ok) accepted++;
-                boolean moved = ok && backend.movedThisTick(Keys.of(tb.entityId(), tb.ray(), p.slot()));
-                BeamLights.LOG.info("[beamlights dump]    slot={} pos={} lum={} status={} moved={}",
-                        p.slot(), fmt(p.pos()), p.luminance(), p.status(), moved);
+                long key = Keys.of(tb.entityId(), tb.ray(), p.slot());
+                boolean moved = ok && backend.movedThisTick(key);
+                boolean ghostMoved = ok && backend.movedThisTick(Keys.ghost(key));
+                if (moved) movedPoints++;
+                BeamLights.LOG.info("[beamlights dump]    slot={} pos={} lum={} status={} moved={}{}",
+                        p.slot(), fmt(p.pos()), p.luminance(), p.status(), moved, ghostMoved ? " ghostMoved=true" : "");
             }
         }
         player.displayClientMessage(Component.literal("[Beam Lights] dumped " + beams.size() + " beams, " + accepted
-                + " light points to latest.log"), false);
+                + " light points (" + movedPoints + " moved, " + backend.movesThisTick()
+                + " changes) to latest.log"), false);
     }
 
     private static String fmt(V3 v) {

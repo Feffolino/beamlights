@@ -119,6 +119,13 @@ public final class BeamClientConfig {
     public static final ModConfigSpec.IntValue FADE_TICKS = B
             .comment("Ticks for a light to fade in or out.")
             .defineInRange("fadeTicks", 4, 1, 20);
+    public static final ModConfigSpec.IntValue FADE_STEPS = B
+            .comment("Distinct light levels of a fade in or out, whatever fadeTicks is (2 = half, then full or off).",
+                    "Each level is one chunk rebuild per light. 0 = one level per tick.")
+            .defineInRange("fadeSteps", 2, 0, 20);
+    public static final ModConfigSpec.IntValue GLIDE_MIN_TICKS = B
+            .comment("A gliding light changes at most once every N ticks (with snapToBlock only block changes count).")
+            .defineInRange("glideMinTicks", 2, 1, 20);
 
     public static final ModConfigSpec.BooleanValue DEBUG_OVERLAY = B
             .comment("Show the debug text overlay (also /beamlights debug overlay on|off).")
@@ -140,7 +147,7 @@ public final class BeamClientConfig {
     public static final ModConfigSpec.IntValue MAX_MOVES_PER_TICK = B
             .comment("Max light source changes (move, luminance change, new, removed) applied per tick; the rest waits",
                     "for the next tick. Local player's central ray first, then nearest. 0 = unlimited.")
-            .defineInRange("maxMovesPerTick", 24, 0, 512);
+            .defineInRange("maxMovesPerTick", 12, 0, 512);
     public static final ModConfigSpec.IntValue REMOTE_UPDATE_INTERVAL = B
             .comment("Beams of other players and entities are re-traced every N ticks (staggered by entity id); in",
                     "between their last light points are reused. 1 = every tick.")
@@ -153,6 +160,18 @@ public final class BeamClientConfig {
             .comment("Drop a midpoint that shares its 16x16x16 chunk section with an accepted light (fewer lights,",
                     "coarser look). Points in the same block are always merged.")
             .define("mergeSameSection", false);
+    public static final ModConfigSpec.DoubleValue MOVE_HYSTERESIS = B
+            .comment("A light (midpoint, side ray) moves only when its target is at least this far (blocks) from the",
+                    "shown position; with snapToBlock: another block AND this distance. A light reaches 7.75 blocks,",
+                    "so a lag of 1-1.5 blocks is barely visible and cuts most chunk rebuilds of a sweeping beam.")
+            .defineInRange("moveHysteresis", 1.5, 0.0, 8.0);
+    public static final ModConfigSpec.DoubleValue CENTRAL_HYSTERESIS = B
+            .comment("Same as moveHysteresis for the hit point of the central ray (the spot you look at).")
+            .defineInRange("centralHysteresis", 0.75, 0.0, 8.0);
+    public static final ModConfigSpec.IntValue LUMINANCE_HYSTERESIS = B
+            .comment("Luminance changes up to this many levels are ignored for midpoints and side rays (the central",
+                    "hit point is always exact); applied together with the next move.")
+            .defineInRange("luminanceHysteresis", 1, 0, 4);
 
     static {
         B.pop();

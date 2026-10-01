@@ -13,11 +13,17 @@ component, KubeJS, Maven artifacts).
 
 The expensive part of dynamic light is not the beam tracing but Sodium re-meshing chunk sections every time a light
 source moves or changes brightness. The client config section `[performance]` limits those changes: `snapToBlock`
-(lights at block centers, default on), `maxMovesPerTick` (budget of light changes per tick, default 24, local
+(lights at block centers, default on), `maxMovesPerTick` (budget of light changes per tick, default 12, local
 player's beam first), `remoteUpdateInterval` (other emitters re-traced every N ticks, default 2), `lodDistance` (far
 emitters use only the central ray, default 24 blocks) and `mergeSameSection` (coarser midpoints, default off).
 `/beamlights perf` shows the settings and live counters (also in the debug overlay);
 `/beamlights perf preset quality|balanced|performance` switches all of them at once.
+
+Since 0.8.2 lights also lag a little to save changes: `moveHysteresis` (1.5 blocks; `centralHysteresis` 0.75 for the
+spot you look at), `luminanceHysteresis`, and fewer smoothing steps (`glideMinTicks`, `fadeSteps`). The debug overlay
+shows `moves/s` and the resulting `rebuilds/s ~N`. To measure the FPS cost, toggle the mod with `/beamlights off` and
+`/beamlights on` (saved, all lights cleared while off) and compare. Any `/beamlights perf|smoothing|layout <key>`
+without a value prints the current value.
 
 ## Data-driven beams (0.7.0)
 

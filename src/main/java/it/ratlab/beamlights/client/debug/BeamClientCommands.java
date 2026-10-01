@@ -38,7 +38,11 @@ public final class BeamClientCommands {
     @SubscribeEvent
     static void onRegister(RegisterClientCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("beamlights")
+                .executes(BeamClientCommands::status)
                 .then(Commands.literal("status").executes(BeamClientCommands::status))
+                // Quick A/B toggle: off clears every light on the next tick (BeamClientTicker).
+                .then(Commands.literal("on").executes(c -> saved(c, BeamClientConfig.ENABLED, true, "enabled")))
+                .then(Commands.literal("off").executes(c -> saved(c, BeamClientConfig.ENABLED, false, "enabled")))
                 .then(Commands.literal("reload").executes(c -> {
                     BeamClientTicker.resetBackend();
                     reply(c, "Backend reset: " + BeamClientTicker.backend().name());
@@ -52,15 +56,24 @@ public final class BeamClientCommands {
                 .then(Commands.literal("debug")
                         .then(toggle("overlay", DebugState::setOverlay))
                         .then(toggle("render", DebugState::setRender))
-                        .then(Commands.literal("dump").executes(c -> {
-                            if (!BeamClientConfig.ENABLED.get() || Minecraft.getInstance().level == null) {
-                                reply(c, "Beam Lights is disabled or no world loaded, nothing to dump");
-                                return 1;
-                            }
-                            DebugState.requestDump();
-                            reply(c, "Dump requested, see latest.log");
-                            return 1;
-                        }))));
+                        .then(Commands.literal("dump")
+                                .executes(c -> dump(c, DUMP_DELAY_TICKS))
+                                .then(Commands.argument("ticks", IntegerArgumentType.integer(0, 200))
+                                        .executes(c -> dump(c, IntegerArgumentType.getInteger(c, "ticks")))))));
+    }
+
+    // The view is frozen while the chat is open: dump a little later so the beam can be moving.
+    private static final int DUMP_DELAY_TICKS = 40;
+
+    private static int dump(CommandContext<CommandSourceStack> c, int delay) {
+        if (!BeamClientConfig.ENABLED.get() || Minecraft.getInstance().level == null) {
+            reply(c, "Beam Lights is disabled or no world loaded, nothing to dump");
+            return 1;
+        }
+        DebugState.requestDump(delay);
+        reply(c, delay == 0 ? "Dump requested, see latest.log"
+                : "Dump in " + delay + " ticks (move the beam now), see latest.log");
+        return 1;
     }
 
     // Forwarded as a normal command through the connection; the server replies with the result or a permission error.
@@ -104,17 +117,30 @@ public final class BeamClientCommands {
                 .then(Commands.literal("on").executes(c -> saved(c, BeamClientConfig.SMOOTHING, true, "smoothing")))
                 .then(Commands.literal("off").executes(c -> saved(c, BeamClientConfig.SMOOTHING, false, "smoothing")))
                 .then(Commands.literal("factor")
+                        .executes(c -> current(c, "smoothFactor", BeamClientConfig.SMOOTH_FACTOR.get()))
                         .then(Commands.argument("v", DoubleArgumentType.doubleArg(0.1, 1.0))
                                 .executes(c -> saved(c, BeamClientConfig.SMOOTH_FACTOR,
                                         DoubleArgumentType.getDouble(c, "v"), "smoothFactor"))))
                 .then(Commands.literal("jump")
+                        .executes(c -> current(c, "jumpDistance", BeamClientConfig.JUMP_DISTANCE.get()))
                         .then(Commands.argument("v", DoubleArgumentType.doubleArg(1.0, 16.0))
                                 .executes(c -> saved(c, BeamClientConfig.JUMP_DISTANCE,
                                         DoubleArgumentType.getDouble(c, "v"), "jumpDistance"))))
                 .then(Commands.literal("fade")
+                        .executes(c -> current(c, "fadeTicks", BeamClientConfig.FADE_TICKS.get()))
                         .then(Commands.argument("ticks", IntegerArgumentType.integer(1, 20))
                                 .executes(c -> saved(c, BeamClientConfig.FADE_TICKS,
-                                        IntegerArgumentType.getInteger(c, "ticks"), "fadeTicks"))));
+                                        IntegerArgumentType.getInteger(c, "ticks"), "fadeTicks"))))
+                .then(Commands.literal("steps")
+                        .executes(c -> current(c, "fadeSteps", BeamClientConfig.FADE_STEPS.get()))
+                        .then(Commands.argument("n", IntegerArgumentType.integer(0, 20))
+                                .executes(c -> saved(c, BeamClientConfig.FADE_STEPS,
+                                        IntegerArgumentType.getInteger(c, "n"), "fadeSteps"))))
+                .then(Commands.literal("glide")
+                        .executes(c -> current(c, "glideMinTicks", BeamClientConfig.GLIDE_MIN_TICKS.get()))
+                        .then(Commands.argument("ticks", IntegerArgumentType.integer(1, 20))
+                                .executes(c -> saved(c, BeamClientConfig.GLIDE_MIN_TICKS,
+                                        IntegerArgumentType.getInteger(c, "ticks"), "glideMinTicks"))));
     }
 
     // set() also updates the cached value, save() writes beamlights-client.toml; applied on the next tick.
@@ -126,14 +152,22 @@ public final class BeamClientCommands {
         return 1;
     }
 
+    /** Prints the current value of a key (subcommand given without a value). */
+    static int current(CommandContext<CommandSourceStack> c, String key, Object value) {
+        reply(c, key + " = " + value);
+        return 1;
+    }
+
     private static String smoothingLine() {
         return (BeamClientConfig.SMOOTHING.get() ? "on" : "off") + ", factor " + BeamClientConfig.SMOOTH_FACTOR.get()
                 + ", jump " + BeamClientConfig.JUMP_DISTANCE.get() + " blocks, fade "
-                + BeamClientConfig.FADE_TICKS.get() + " ticks";
+                + BeamClientConfig.FADE_TICKS.get() + " ticks in " + BeamClientConfig.FADE_STEPS.get()
+                + " steps, glide every " + BeamClientConfig.GLIDE_MIN_TICKS.get() + " ticks";
     }
 
     private static int status(CommandContext<CommandSourceStack> c) {
         LightBackend b = BeamClientTicker.backend();
+        reply(c, "Enabled: " + (BeamClientConfig.ENABLED.get() ? "on" : "off") + " (/beamlights on|off)");
         reply(c, "Backend: " + b.name() + " (" + b.statusLine() + ")");
         reply(c, "Sources: " + b.ownCount() + " own / " + (b.totalCount() < 0 ? "?" : b.totalCount()) + " engine total");
         reply(c, "Layout: " + BeamClientTicker.layoutLine() + " (/beamlights layout show)");

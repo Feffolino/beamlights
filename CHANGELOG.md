@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.2 (unreleased)
+- Fewer chunk rebuilds (in-game: 150 moves/s with 8 sources = about 1200 section rebuilds/s, -30 FPS):
+  - `moveHysteresis` (default 1.5 blocks) and `centralHysteresis` (0.75, central hit point): a light moves only when
+    its target is that far from the shown position (with snapToBlock: another block and that distance).
+  - `luminanceHysteresis` (default 1): 1-level luminance changes ignored for midpoints and side rays.
+  - Smoothing: `glideMinTicks` (default 2) caps glide changes per light; `fadeSteps` (default 2) limits a fade to
+    half then full/off whatever `fadeTicks` is, so a crossfade costs 4 changes instead of 8.
+  - `maxMovesPerTick` default 24 -> 12; presets: quality 32, balanced 12, performance 6 (presets set the new keys
+    too). A saved `maxMovesPerTick = 24` stays until `/beamlights perf preset balanced` is re-applied.
+  - Simulated pipeline (8 sources): slow sweep 91 -> 48 changes in 40 ticks, jumps -50%.
+- `/beamlights on|off` (saved, clears all lights) for quick A/B FPS tests; `/beamlights` alone shows the status,
+  which now includes the enabled state.
+- Perf, smoothing (`steps`, `glide` added) and layout subcommands without a value print the current value. New
+  `/beamlights perf hysteresis|centralhysteresis|lumhysteresis`.
+- Overlay: `rebuilds/s ~N` (applied changes per second x 8) next to `moves/s`.
+- Debug dump: `/beamlights debug dump [ticks]` waits 40 ticks by default. The view is frozen while the chat is open,
+  so the immediate dump always caught a still beam and printed `moved=false` for every point; it now also logs the
+  applied/deferred change counts and ghost changes.
+
 ## 0.8.1 (unreleased)
 - Beam item data moved from the registered data component `beamlights:beam` to the vanilla `minecraft:custom_data`
   component, key `"beamlights:beam"` (same fields). The mod registers nothing in a synced registry again, so it is

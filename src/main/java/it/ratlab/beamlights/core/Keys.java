@@ -8,6 +8,8 @@ package it.ratlab.beamlights.core;
 public final class Keys {
     /** Slot bit of a ghost key: the fading copy left behind when a light jumps or disappears. */
     public static final int GHOST_BIT = 0x80;
+    /** Ray indices per beam: ray = beamIndex * RAYS_PER_BEAM + subRay (sub 0 = central). */
+    public static final int RAYS_PER_BEAM = 32;
 
     private Keys() {
     }
@@ -34,5 +36,10 @@ public final class Keys {
 
     public static int slot(long key) {
         return (int) (key & 0xFF);
+    }
+
+    /** Hit point (slot 0) of a central ray, not a ghost: the light the player looks at. */
+    public static boolean isCentralHit(long key) {
+        return slot(key) == 0 && ray(key) % RAYS_PER_BEAM == 0;
     }
 }

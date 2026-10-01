@@ -8,7 +8,8 @@ import java.util.List;
 public final class DebugState {
     private static Boolean overlayOverride;
     private static Boolean renderOverride;
-    private static boolean dumpRequested;
+    /** Ticks until the requested dump, -1 = none. */
+    private static int dumpIn = -1;
     private static List<TracedBeam> lastFrame = List.of();
 
     private DebugState() {
@@ -30,18 +31,28 @@ public final class DebugState {
         renderOverride = on;
     }
 
-    public static void requestDump() {
-        dumpRequested = true;
+    /**
+     * Dumps the tick delayTicks from now. The view is frozen while the chat is open, so a dump right after the command
+     * always shows a still beam (moved=false everywhere); the delay leaves time to move.
+     */
+    public static void requestDump(int delayTicks) {
+        dumpIn = Math.max(0, delayTicks);
     }
 
+    /** True on the tick the dump is written (the ticker captures the frame). */
     public static boolean dumpRequested() {
-        return dumpRequested;
+        return dumpIn == 0;
     }
 
+    /** Called once at the end of every tick: true when the dump must be written now, else counts down. */
     public static boolean consumeDump() {
-        boolean r = dumpRequested;
-        dumpRequested = false;
-        return r;
+        if (dumpIn < 0) return false;
+        if (dumpIn == 0) {
+            dumpIn = -1;
+            return true;
+        }
+        dumpIn--;
+        return false;
     }
 
     public static List<TracedBeam> lastFrame() {

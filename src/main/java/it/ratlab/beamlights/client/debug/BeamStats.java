@@ -22,6 +22,8 @@ public final class BeamStats {
     private int movesWindow;
     private long windowStart;
     private int movesPerSecond;
+    /** Chunk sections Sodium Dynamic Lights rebuilds per light source change (at most). */
+    public static final int SECTIONS_PER_CHANGE = 8;
 
     public void beginTick() {
         beams = accepted = skippedAir = merged = capped = globalCapped = ghosts = lodEmitters = reusedEmitters = 0;
@@ -66,7 +68,8 @@ public final class BeamStats {
                         + BeamClientConfig.MAX_SOURCES.get(),
                 "beams: " + beams + "  points: " + accepted + " ok, " + skippedAir + " air, " + merged + " merged, "
                         + capped + " capped, " + globalCapped + " over max",
-                String.format(Locale.ROOT, "moves/s: %d  tick: %.1f us", movesPerSecond, avgMicros),
+                String.format(Locale.ROOT, "moves/s: %d  rebuilds/s ~%d  tick: %.1f us", movesPerSecond,
+                        movesPerSecond * SECTIONS_PER_CHANGE, avgMicros),
                 perfLine(),
                 "layout: " + layout,
                 "providers: " + BeamRegistry.INSTANCE.providerNames());

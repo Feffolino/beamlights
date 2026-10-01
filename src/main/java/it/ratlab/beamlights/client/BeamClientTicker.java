@@ -43,7 +43,7 @@ import java.util.Map;
 public final class BeamClientTicker {
     public static final BeamStats STATS = new BeamStats();
     private static final double HIT_BACKOFF = 0.5;
-    private static final int RAYS_PER_BEAM = 32;
+    private static final int RAYS_PER_BEAM = Keys.RAYS_PER_BEAM;
     private static final int MAX_BEAMS_PER_ENTITY = 256 / RAYS_PER_BEAM;
 
     private static LayoutKey layoutKey;
@@ -304,7 +304,8 @@ public final class BeamClientTicker {
         // Global cap on the smoothed output; ghosts come last, so they are the first to go.
         List<LightSmoother.Output> out = SMOOTHER.update(targets, new LightSmoother.Settings(
                 BeamClientConfig.SMOOTHING.get(), BeamClientConfig.SMOOTH_FACTOR.get(),
-                BeamClientConfig.JUMP_DISTANCE.get(), BeamClientConfig.FADE_TICKS.get()));
+                BeamClientConfig.JUMP_DISTANCE.get(), BeamClientConfig.FADE_TICKS.get(),
+                BeamClientConfig.FADE_STEPS.get(), BeamClientConfig.GLIDE_MIN_TICKS.get(), snap));
         V3 viewer = new V3(player.getX(), player.getEyeY(), player.getZ());
         b.begin(viewer, BeamClientConfig.MAX_MOVES_PER_TICK.get());
         int used = 0;

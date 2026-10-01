@@ -2,6 +2,7 @@ package it.ratlab.beamlights.client.sdl;
 
 import it.ratlab.beamlights.client.LightBackend;
 import it.ratlab.beamlights.config.BeamClientConfig;
+import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.MoveScheduler;
 import it.ratlab.beamlights.core.SourceMotion;
 import it.ratlab.beamlights.api.math.V3;
@@ -17,8 +18,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One pooled BeamLightSource per stable key. Changes (move past the threshold, luminance change, new source,
- * removal) are collected during the tick and applied in end() within the move budget (MoveScheduler); the rest keeps
+ * One pooled BeamLightSource per stable key. Changes (move past the threshold and hysteresis, luminance change
+ * past the tolerance, new source, removal; see SourceMotion.shouldChange) are collected during the tick and applied in end() within the move budget (MoveScheduler); the rest keeps
  * its old state and is offered again next tick.
  */
 public final class SdlBackend implements LightBackend {
@@ -42,6 +43,7 @@ public final class SdlBackend implements LightBackend {
     private int changeCount;
     private V3 viewer = V3.ZERO;
     private int budget;
+    private SourceMotion.Gate gate = SourceMotion.Gate.legacy(0.25);
     private int deferred;
 
     private SdlBackend(SodiumDynamicLights sdl) {
@@ -67,6 +69,9 @@ public final class SdlBackend implements LightBackend {
         changeCount = 0;
         this.viewer = viewer;
         this.budget = moveBudget;
+        this.gate = new SourceMotion.Gate(BeamClientConfig.MOVE_THRESHOLD.get(),
+                BeamClientConfig.MOVE_HYSTERESIS.get(), BeamClientConfig.CENTRAL_HYSTERESIS.get(),
+                BeamClientConfig.LUMINANCE_HYSTERESIS.get());
     }
 
     @Override
@@ -82,7 +87,7 @@ public final class SdlBackend implements LightBackend {
         double displacement;
         if (src != null && src.hasPosition()) {
             double d = src.distSq(pos);
-            if (!SourceMotion.shouldMove(d, src.luminance(), luminance, BeamClientConfig.MOVE_THRESHOLD.get())) {
+            if (!SourceMotion.shouldChange(d, src.luminance(), luminance, Keys.isCentralHit(key), gate)) {
                 SodiumDynamicLights.updateTracking(src);
                 return;
             }

@@ -34,35 +34,45 @@ final class LayoutCommands {
                 .executes(LayoutCommands::show)
                 .then(Commands.literal("show").executes(LayoutCommands::show))
                 .then(Commands.literal("pattern")
+                        .executes(c -> cur(c, "rayPattern", BeamClientConfig.RAY_PATTERN))
                         .then(Commands.argument("pattern", StringArgumentType.word())
                                 .suggests((c, b) -> SharedSuggestionProvider.suggest(
                                         Arrays.stream(RayLayout.Pattern.values()).map(Enum::name), b))
                                 .executes(LayoutCommands::pattern)))
                 .then(Commands.literal("rays")
+                        .executes(c -> cur(c, "sideRays", BeamClientConfig.SIDE_RAYS))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1, RayLayout.MAX_SIDE_RAYS))
                                 .executes(c -> setInt(c, BeamClientConfig.SIDE_RAYS, "n", "sideRays"))))
                 .then(Commands.literal("spread")
+                        .executes(c -> cur(c, "coneSpread", BeamClientConfig.CONE_SPREAD))
                         .then(Commands.argument("f", DoubleArgumentType.doubleArg(0, 1))
                                 .executes(c -> setDouble(c, BeamClientConfig.CONE_SPREAD, "f", "coneSpread"))))
                 .then(Commands.literal("roll")
+                        .executes(c -> cur(c, "rayRollOffset", BeamClientConfig.RAY_ROLL_OFFSET))
                         .then(Commands.argument("deg", DoubleArgumentType.doubleArg(0, 360))
                                 .executes(c -> setDouble(c, BeamClientConfig.RAY_ROLL_OFFSET, "deg", "rayRollOffset"))))
                 .then(Commands.literal("inner")
+                        .executes(c -> current(c, "innerRays", BeamClientConfig.INNER_RAYS.get() + ", innerSpread = "
+                                + BeamClientConfig.INNER_SPREAD.get()))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1, 12))
                                 .then(Commands.argument("f", DoubleArgumentType.doubleArg(0, 1))
                                         .executes(LayoutCommands::inner))))
                 .then(Commands.literal("range")
+                        .executes(c -> cur(c, "sideRangeFactor", BeamClientConfig.SIDE_RANGE_FACTOR))
                         .then(Commands.argument("f", DoubleArgumentType.doubleArg(0.1, 1))
                                 .executes(c -> setDouble(c, BeamClientConfig.SIDE_RANGE_FACTOR, "f", "sideRangeFactor"))))
                 .then(Commands.literal("budget")
+                        .executes(c -> cur(c, "maxSourcesPerEntity", BeamClientConfig.MAX_SOURCES_PER_ENTITY))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1, 64))
                                 .executes(c -> setInt(c, BeamClientConfig.MAX_SOURCES_PER_ENTITY, "n",
                                         "maxSourcesPerEntity"))))
                 .then(Commands.literal("luminance")
+                        .executes(c -> cur(c, "sideLuminanceOffset", BeamClientConfig.SIDE_LUMINANCE_OFFSET))
                         .then(Commands.argument("offset", IntegerArgumentType.integer(-15, 0))
                                 .executes(c -> setInt(c, BeamClientConfig.SIDE_LUMINANCE_OFFSET, "offset",
                                         "sideLuminanceOffset"))))
                 .then(Commands.literal("midpoints")
+                        .executes(c -> cur(c, "sideMidpoints", BeamClientConfig.SIDE_MIDPOINTS))
                         .then(Commands.argument("on", BoolArgumentType.bool())
                                 .executes(c -> {
                                     boolean v = BoolArgumentType.getBool(c, "on");
@@ -220,6 +230,14 @@ final class LayoutCommands {
     private static <T> void save(ModConfigSpec.ConfigValue<T> v, T value) {
         v.set(value);
         v.save();
+    }
+
+    private static <T> int cur(CommandContext<CommandSourceStack> c, String key, ModConfigSpec.ConfigValue<T> v) {
+        return current(c, key, v.get());
+    }
+
+    private static int current(CommandContext<CommandSourceStack> c, String key, Object value) {
+        return BeamClientCommands.current(c, key, value);
     }
 
     private static int done(CommandContext<CommandSourceStack> c, String msg) {

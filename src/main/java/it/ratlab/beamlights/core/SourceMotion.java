@@ -18,6 +18,32 @@ public final class SourceMotion {
     }
 
     /**
+     * Change gate of a shown light source. threshold = moveThreshold; hysteresis / centralHysteresis = minimum distance
+     * (blocks) between the shown position and the target before a move (the central hit point uses the smaller one);
+     * lumTolerance = luminance difference ignored for lights other than the central hit point.
+     */
+    public record Gate(double threshold, double hysteresis, double centralHysteresis, int lumTolerance) {
+        /** The 0.8.1 behaviour: moveThreshold only, every luminance change applied. */
+        public static Gate legacy(double threshold) {
+            return new Gate(threshold, 0, 0, 0);
+        }
+    }
+
+    /**
+     * True when a shown light (distSq from its target, currentLuminance) must be changed. A move needs the target at
+     * least max(threshold, hysteresis) away; with snapped positions that means another block AND that distance. A
+     * luminance change counts when it exceeds the tolerance (exact for the central hit point). A move also applies
+     * the pending luminance.
+     */
+    public static boolean shouldChange(double distSq, int currentLuminance, int targetLuminance, boolean central,
+                                       Gate g) {
+        int dl = Math.abs(targetLuminance - currentLuminance);
+        if (dl > (central ? 0 : Math.max(0, g.lumTolerance()))) return true;
+        double min = Math.max(g.threshold(), central ? g.centralHysteresis() : g.hysteresis());
+        return distSq > 0 && distSq >= min * min;
+    }
+
+    /**
      * Center of the block containing p. Sodium Dynamic Lights lights whole blocks, so a snapped source only moves (and
      * rebuilds sections) when it enters another block.
      */
