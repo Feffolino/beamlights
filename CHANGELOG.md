@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 (unreleased)
+- Cone light smoothing (LDL `ldlConeLight`, needs `smoothing`): a cone length jump (near face to far face,
+  >= `jumpDistance`) is walked in `coneSteps` (new, default 3, `/beamlights smoothing conesteps <n>`) equal steps,
+  one every `glideMinTicks` ticks; smaller changes lerp by `smoothFactor`; a vanished cone fades out over
+  `fadeSteps` instead of vanishing. Apex, direction and luminance still follow at once; every change goes
+  through the existing change gate and move budget. Hit point lights already crossfaded in LDL mode (they pass
+  through LightSmoother like with SDL).
+
 ## 1.0.0 (unreleased)
 All five phases of the design are done: 1 single-beam dynamic light (SDL), 2 multi-ray cone, 3 spawn blocking (and
 optional mob attraction), 4 data-driven beams (datapack, Java API, item component, KubeJS), 5 LambDynamicLights

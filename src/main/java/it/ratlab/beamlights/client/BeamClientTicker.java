@@ -11,6 +11,7 @@ import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
 import it.ratlab.beamlights.core.ConeLight;
 import it.ratlab.beamlights.core.ConeRays;
+import it.ratlab.beamlights.core.ConeSmoother;
 import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
@@ -54,6 +55,7 @@ public final class BeamClientTicker {
     private static List<RaySpec> cachedLayout = List.of();
 
     private static final LightSmoother SMOOTHER = new LightSmoother();
+    private static final ConeSmoother CONE_SMOOTHER = new ConeSmoother();
 
     private static LightBackend backend;
     private static ClientLevel lastLevel;
@@ -94,6 +96,7 @@ public final class BeamClientTicker {
         } catch (Throwable t) {
             LightBackend old = backend();
             SMOOTHER.clear();
+            CONE_SMOOTHER.clear();
             try {
                 old.clear();
             } catch (Throwable ignored) {
@@ -117,6 +120,7 @@ public final class BeamClientTicker {
 
     private static void safeClear() {
         SMOOTHER.clear();
+        CONE_SMOOTHER.clear();
         EMITTER_CACHE.clear();
         if (backend == null) return;
         try {
@@ -192,6 +196,7 @@ public final class BeamClientTicker {
 
     // Reused every tick (client thread only).
     private static final List<ConeTarget> CONES = new ArrayList<>();
+    private static final List<ConeSmoother.Target> CONE_IN = new ArrayList<>();
     private static final Map<Integer, EmitterCache> EMITTER_CACHE = new HashMap<>();
     private static final List<Entity> EMITTERS = new ArrayList<>();
     private static final List<LightSmoother.Target> TARGETS = new ArrayList<>();
@@ -367,7 +372,13 @@ public final class BeamClientTicker {
             used++;
             if (o.ghost()) STATS.ghosts++;
         }
-        for (ConeTarget c : CONES) {
+        CONE_IN.clear();
+        for (ConeTarget c : CONES) CONE_IN.add(new ConeSmoother.Target(c.key(), c.shape()));
+        for (ConeSmoother.Target c : CONE_SMOOTHER.update(CONE_IN, new ConeSmoother.Settings(
+                BeamClientConfig.SMOOTHING.get(), BeamClientConfig.SMOOTH_FACTOR.get(),
+                BeamClientConfig.JUMP_DISTANCE.get(), BeamClientConfig.CONE_STEPS.get(),
+                BeamClientConfig.GLIDE_MIN_TICKS.get(), BeamClientConfig.FADE_TICKS.get(),
+                BeamClientConfig.FADE_STEPS.get()))) {
             int id = Keys.entityId(c.key());
             b.putBeam(c.key(), c.shape(), id == localId, RESYNC.contains(id));
         }

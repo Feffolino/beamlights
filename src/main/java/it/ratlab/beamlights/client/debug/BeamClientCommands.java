@@ -141,7 +141,12 @@ public final class BeamClientCommands {
                         .executes(c -> current(c, "glideMinTicks", BeamClientConfig.GLIDE_MIN_TICKS.get()))
                         .then(Commands.argument("ticks", IntegerArgumentType.integer(1, 20))
                                 .executes(c -> saved(c, BeamClientConfig.GLIDE_MIN_TICKS,
-                                        IntegerArgumentType.getInteger(c, "ticks"), "glideMinTicks"))));
+                                        IntegerArgumentType.getInteger(c, "ticks"), "glideMinTicks"))))
+                .then(Commands.literal("conesteps")
+                        .executes(c -> current(c, "coneSteps", BeamClientConfig.CONE_STEPS.get()))
+                        .then(Commands.argument("n", IntegerArgumentType.integer(1, 8))
+                                .executes(c -> saved(c, BeamClientConfig.CONE_STEPS,
+                                        IntegerArgumentType.getInteger(c, "n"), "coneSteps"))));
     }
 
     // set() also updates the cached value, save() writes beamlights-client.toml; applied on the next tick.
@@ -163,7 +168,7 @@ public final class BeamClientCommands {
         return (BeamClientConfig.SMOOTHING.get() ? "on" : "off") + ", factor " + BeamClientConfig.SMOOTH_FACTOR.get()
                 + ", jump " + BeamClientConfig.JUMP_DISTANCE.get() + " blocks, fade "
                 + BeamClientConfig.FADE_TICKS.get() + " ticks in " + BeamClientConfig.FADE_STEPS.get()
-                + " steps, glide every " + BeamClientConfig.GLIDE_MIN_TICKS.get() + " ticks";
+                + " steps, glide every " + BeamClientConfig.GLIDE_MIN_TICKS.get() + " ticks, cone steps " + BeamClientConfig.CONE_STEPS.get();
     }
 
     private static int status(CommandContext<CommandSourceStack> c) {

@@ -127,6 +127,10 @@ public final class BeamClientConfig {
     public static final ModConfigSpec.IntValue GLIDE_MIN_TICKS = B
             .comment("A gliding light changes at most once every N ticks (with snapToBlock only block changes count).")
             .defineInRange("glideMinTicks", 2, 1, 20);
+    public static final ModConfigSpec.IntValue CONE_STEPS = B
+            .comment("LDL cone light: a length jump (near face to far face, >= jumpDistance) is walked in this many equal",
+                    "steps, one every glideMinTicks ticks. Smaller changes lerp by smoothFactor. Needs smoothing on.")
+            .defineInRange("coneSteps", 3, 1, 8);
 
     public static final ModConfigSpec.BooleanValue DEBUG_OVERLAY = B
             .comment("Show the debug text overlay (also /beamlights debug overlay on|off).")
