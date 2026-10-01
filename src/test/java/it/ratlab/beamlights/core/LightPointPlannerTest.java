@@ -122,4 +122,35 @@ class LightPointPlannerTest {
         assertEquals(2, plan.count(Status.CAPPED));
         assertEquals(12, shared.size());
     }
+
+    @Test
+    void sameBlockMergedEvenWithZeroMergeDistance() {
+        LightPointPlanner.Settings s = new LightPointPlanner.Settings(true, 6.0, -4, 6, 0.0, 0.5);
+        List<V3> shared = new ArrayList<>(List.of(new V3(6.9, 64.1, 0.9)));  // same block as the d = 6 midpoint
+        LightPointPlanner.Plan plan = LightPointPlanner.plan(O, DIR, miss(13), 14, s, ALWAYS_NEAR, shared, true);
+        assertEquals(Status.MERGED, plan.points().get(0).status());
+        assertEquals(Status.ACCEPTED, plan.points().get(1).status());
+    }
+
+    @Test
+    void sectionMergeDropsMidpointsInAcceptedSection() {
+        LightPointPlanner.Settings off = new LightPointPlanner.Settings(true, 4.0, -4, 16, 1.0, 0.5, false);
+        LightPointPlanner.Settings on = new LightPointPlanner.Settings(true, 4.0, -4, 16, 1.0, 0.5, true);
+        // Ray along x from 0.5 to 30: midpoints at x 4.5, 8.5, 12.5 (section 0), 16.5, 20.5, 24.5, 28.5 (section 1).
+        LightPointPlanner.Plan a = LightPointPlanner.plan(O, DIR, miss(30), 14, off, ALWAYS_NEAR);
+        LightPointPlanner.Plan b = LightPointPlanner.plan(O, DIR, miss(30), 14, on, ALWAYS_NEAR);
+        assertEquals(7, a.accepted().size());
+        assertEquals(2, b.accepted().size());
+        assertEquals(5, b.count(Status.MERGED));
+    }
+
+    @Test
+    void withMidpointsKeepsOtherFields() {
+        LightPointPlanner.Settings s = new LightPointPlanner.Settings(true, 5.0, -3, 4, 2.0, 0.5, true);
+        LightPointPlanner.Settings n = s.withMidpoints(false);
+        assertFalse(n.midpoints());
+        assertTrue(n.sectionMerge());
+        assertEquals(5.0, n.midSpacing());
+        assertSame(s, s.withMidpoints(true));
+    }
 }

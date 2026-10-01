@@ -12,6 +12,10 @@ import java.util.Locale;
 /** Per-tick counters plus smoothed tick cost and moves per second. */
 public final class BeamStats {
     public int beams, accepted, skippedAir, merged, capped, globalCapped, ghosts;
+    /** Emitters reduced to the central ray (lodDistance) and emitters whose last points were reused this tick. */
+    public int lodEmitters, reusedEmitters;
+    public boolean snapped;
+    private int movesTick, deferredTick;
     /** Set by the ticker when the ray layout is rebuilt. */
     public String layout = "-";
     private double avgMicros;
@@ -20,7 +24,7 @@ public final class BeamStats {
     private int movesPerSecond;
 
     public void beginTick() {
-        beams = accepted = skippedAir = merged = capped = globalCapped = ghosts = 0;
+        beams = accepted = skippedAir = merged = capped = globalCapped = ghosts = lodEmitters = reusedEmitters = 0;
     }
 
     public void addPlan(LightPointPlanner.Plan plan) {
@@ -31,7 +35,9 @@ public final class BeamStats {
         capped += plan.count(Status.CAPPED);
     }
 
-    public void endTick(long nanos, int moves) {
+    public void endTick(long nanos, int moves, int deferred) {
+        movesTick = moves;
+        deferredTick = deferred;
         avgMicros = avgMicros * 0.9 + (nanos / 1000.0) * 0.1;
         movesWindow += moves;
         long now = System.currentTimeMillis();
@@ -40,6 +46,15 @@ public final class BeamStats {
             movesWindow = 0;
             windowStart = now;
         }
+    }
+
+    /** Moves applied/deferred this tick, snapping, LOD and reuse counts (overlay and /beamlights perf). */
+    public String perfLine() {
+        int budget = BeamClientConfig.MAX_MOVES_PER_TICK.get();
+        return "perf: moves " + movesTick + " applied, " + deferredTick + " deferred (budget "
+                + (budget <= 0 ? "off" : budget) + "), snap " + (snapped ? "on" : "off") + ", LOD " + lodEmitters
+                + " emitters, reused " + reusedEmitters + " (every " + BeamClientConfig.REMOTE_UPDATE_INTERVAL.get()
+                + " t)";
     }
 
     public List<String> lines(LightBackend backend) {
@@ -52,6 +67,7 @@ public final class BeamStats {
                 "beams: " + beams + "  points: " + accepted + " ok, " + skippedAir + " air, " + merged + " merged, "
                         + capped + " capped, " + globalCapped + " over max",
                 String.format(Locale.ROOT, "moves/s: %d  tick: %.1f us", movesPerSecond, avgMicros),
+                perfLine(),
                 "layout: " + layout,
                 "providers: " + BeamRegistry.INSTANCE.providerNames());
     }

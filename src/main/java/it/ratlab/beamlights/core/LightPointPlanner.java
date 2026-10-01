@@ -9,8 +9,21 @@ import java.util.List;
 public final class LightPointPlanner {
     public enum Status { ACCEPTED, MERGED, SKIPPED_AIR, CAPPED }
 
+    /**
+     * @param sectionMerge also drop a midpoint that shares its 16x16x16 section with an accepted point (coarser,
+     *                     fewer lights; points in the same block are always merged)
+     */
     public record Settings(boolean midpoints, double midSpacing, int midLuminanceOffset, int maxPerBeam,
-                           double mergeDistance, double hitBackoff) {
+                           double mergeDistance, double hitBackoff, boolean sectionMerge) {
+        public Settings(boolean midpoints, double midSpacing, int midLuminanceOffset, int maxPerBeam,
+                        double mergeDistance, double hitBackoff) {
+            this(midpoints, midSpacing, midLuminanceOffset, maxPerBeam, mergeDistance, hitBackoff, false);
+        }
+
+        public Settings withMidpoints(boolean on) {
+            return on == midpoints ? this
+                    : new Settings(on, midSpacing, midLuminanceOffset, maxPerBeam, mergeDistance, hitBackoff, sectionMerge);
+        }
     }
 
     public record PlannedPoint(int slot, V3 pos, int luminance, Status status) {
@@ -21,8 +34,13 @@ public final class LightPointPlanner {
             return points.stream().filter(p -> p.status() == Status.ACCEPTED).toList();
         }
 
+        // Loop, not a stream: called four times per ray per tick for the stats.
         public int count(Status status) {
-            return (int) points.stream().filter(p -> p.status() == status).count();
+            int n = 0;
+            for (PlannedPoint p : points) {
+                if (p.status() == status) n++;
+            }
+            return n;
         }
     }
 
@@ -55,7 +73,7 @@ public final class LightPointPlanner {
         if (trace.hit()) {
             V3 p = origin.add(dir.scale(Math.max(0, trace.distance() - s.hitBackoff())));
             Status st;
-            if (mergeHit && isNear(sharedAccepted, p, mergeSq)) st = Status.MERGED;
+            if (mergeHit && isNear(sharedAccepted, p, mergeSq, false)) st = Status.MERGED;
             else if (s.maxPerBeam() < 1) st = Status.CAPPED;
             else {
                 st = Status.ACCEPTED;
@@ -73,7 +91,7 @@ public final class LightPointPlanner {
                  d += s.midSpacing(), slot++) {
                 V3 p = origin.add(dir.scale(d));
                 Status st;
-                if (isNear(sharedAccepted, p, mergeSq)) st = Status.MERGED;
+                if (isNear(sharedAccepted, p, mergeSq, s.sectionMerge())) st = Status.MERGED;
                 else if (!probe.nearOccluder(p)) st = Status.SKIPPED_AIR;
                 else if (own >= s.maxPerBeam()) st = Status.CAPPED;
                 else {
@@ -87,10 +105,19 @@ public final class LightPointPlanner {
         return new Plan(out);
     }
 
-    private static boolean isNear(List<V3> accepted, V3 p, double mergeSq) {
+    // Within mergeDistance, in the same block (SDL lights per block anyway) or, with section, in the same section.
+    private static boolean isNear(List<V3> accepted, V3 p, double mergeSq, boolean section) {
+        int bx = floor(p.x()), by = floor(p.y()), bz = floor(p.z());
         for (V3 a : accepted) {
             if (a.distSq(p) < mergeSq) return true;
+            int ax = floor(a.x()), ay = floor(a.y()), az = floor(a.z());
+            if (ax == bx && ay == by && az == bz) return true;
+            if (section && ax >> 4 == bx >> 4 && ay >> 4 == by >> 4 && az >> 4 == bz >> 4) return true;
         }
         return false;
+    }
+
+    private static int floor(double v) {
+        return (int) Math.floor(v);
     }
 }

@@ -48,6 +48,9 @@ public final class LightSmoother {
 
     private final Map<Long, Live> live = new LinkedHashMap<>();
     private final Map<Long, Ghost> ghosts = new LinkedHashMap<>();
+    // Per-update scratch sets, reused.
+    private final Set<Long> targeted = new HashSet<>();
+    private final Set<Long> fresh = new HashSet<>();
 
     public List<Output> update(List<Target> targets, Settings s) {
         List<Output> out = new ArrayList<>(targets.size() + ghosts.size());
@@ -59,9 +62,9 @@ public final class LightSmoother {
         int fade = Math.max(1, s.fadeTicks());
         int lumStep = (15 + fade - 1) / fade;
         double jumpSq = s.jumpDistance() * s.jumpDistance();
-        Set<Long> targeted = new HashSet<>();
+        targeted.clear();
         // Ghosts spawned this tick already show their first fade step.
-        Set<Long> fresh = new HashSet<>();
+        fresh.clear();
 
         for (Target t : targets) {
             if (t.luminance() <= 0 || !targeted.add(t.key())) continue;

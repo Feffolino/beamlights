@@ -45,6 +45,12 @@ public final class BeamLightSource implements DynamicLightSource {
         return luminance;
     }
 
+    /** Squared distance to p without allocating. */
+    double distSq(V3 p) {
+        double dx = x - p.x(), dy = y - p.y(), dz = z - p.z();
+        return dx * dx + dy * dy + dz * dz;
+    }
+
     void set(V3 pos, int lum) {
         x = pos.x();
         y = pos.y();

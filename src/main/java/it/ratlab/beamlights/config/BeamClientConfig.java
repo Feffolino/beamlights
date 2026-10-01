@@ -127,6 +127,37 @@ public final class BeamClientConfig {
             .comment("Draw rays and light points in the world (also /beamlights debug render on|off).")
             .define("debugRender", false);
 
+    // Performance: the main cost is Sodium chunk-section rebuilds, one batch per light source change.
+    static {
+        B.comment("Performance. Every light source move or luminance change makes Sodium rebuild up to 8 chunk",
+                "sections; these keys cut the number of changes. Presets: /beamlights perf preset ...").push("performance");
+    }
+
+    public static final ModConfigSpec.BooleanValue SNAP_TO_BLOCK = B
+            .comment("Place lights at block centers: a light only moves when it enters another block (Sodium Dynamic",
+                    "Lights lights whole blocks anyway). Off = free positions with moveThreshold.")
+            .define("snapToBlock", true);
+    public static final ModConfigSpec.IntValue MAX_MOVES_PER_TICK = B
+            .comment("Max light source changes (move, luminance change, new, removed) applied per tick; the rest waits",
+                    "for the next tick. Local player's central ray first, then nearest. 0 = unlimited.")
+            .defineInRange("maxMovesPerTick", 24, 0, 512);
+    public static final ModConfigSpec.IntValue REMOTE_UPDATE_INTERVAL = B
+            .comment("Beams of other players and entities are re-traced every N ticks (staggered by entity id); in",
+                    "between their last light points are reused. 1 = every tick.")
+            .defineInRange("remoteUpdateInterval", 2, 1, 20);
+    public static final ModConfigSpec.IntValue LOD_DISTANCE = B
+            .comment("Emitters farther than this (blocks) use the central ray only (no side rays, no midpoints).",
+                    "The local player is never reduced. 0 = off.")
+            .defineInRange("lodDistance", 24, 0, 256);
+    public static final ModConfigSpec.BooleanValue MERGE_SAME_SECTION = B
+            .comment("Drop a midpoint that shares its 16x16x16 chunk section with an accepted light (fewer lights,",
+                    "coarser look). Points in the same block are always merged.")
+            .define("mergeSameSection", false);
+
+    static {
+        B.pop();
+    }
+
     public static final ModConfigSpec SPEC = B.build();
 
     private BeamClientConfig() {

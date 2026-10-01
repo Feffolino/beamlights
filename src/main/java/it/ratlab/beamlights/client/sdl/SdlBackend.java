@@ -2,6 +2,7 @@ package it.ratlab.beamlights.client.sdl;
 
 import it.ratlab.beamlights.client.LightBackend;
 import it.ratlab.beamlights.config.BeamClientConfig;
+import it.ratlab.beamlights.core.MoveScheduler;
 import it.ratlab.beamlights.core.SourceMotion;
 import it.ratlab.beamlights.api.math.V3;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -12,12 +13,36 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.Level;
 import toni.sodiumdynamiclights.SodiumDynamicLights;
 
-/** One pooled BeamLightSource per stable key; sources move only past the move threshold. */
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * One pooled BeamLightSource per stable key. Changes (move past the threshold, luminance change, new source,
+ * removal) are collected during the tick and applied in end() within the move budget (MoveScheduler); the rest keeps
+ * its old state and is offered again next tick.
+ */
 public final class SdlBackend implements LightBackend {
+    // Ranking weight of new and removed sources: before plain moves at the same distance.
+    private static final double APPEAR_DISPLACEMENT = 1e6;
+
+    private static final class Change {
+        long key;
+        V3 pos;
+        int lum;
+        BeamLightSource src;
+        boolean removal;
+    }
+
     private final SodiumDynamicLights sdl;
     private final Long2ObjectOpenHashMap<BeamLightSource> sources = new Long2ObjectOpenHashMap<>();
     private final LongOpenHashSet seen = new LongOpenHashSet();
     private final LongOpenHashSet moved = new LongOpenHashSet();
+    private final MoveScheduler<Change> scheduler = new MoveScheduler<>();
+    private final List<Change> changePool = new ArrayList<>();
+    private int changeCount;
+    private V3 viewer = V3.ZERO;
+    private int budget;
+    private int deferred;
 
     private SdlBackend(SodiumDynamicLights sdl) {
         this.sdl = sdl;
@@ -35,27 +60,40 @@ public final class SdlBackend implements LightBackend {
     }
 
     @Override
-    public void begin() {
+    public void begin(V3 viewer, int moveBudget) {
         seen.clear();
         moved.clear();
+        scheduler.begin();
+        changeCount = 0;
+        this.viewer = viewer;
+        this.budget = moveBudget;
     }
 
     @Override
-    public void put(long key, V3 pos, int luminance) {
+    public void put(long key, V3 pos, int luminance, boolean priority) {
         seen.add(key);
         Level level = Minecraft.getInstance().level;
         BeamLightSource src = sources.get(key);
-        if (src == null || src.level() != level) {
-            if (src != null) src.remove();
-            src = new BeamLightSource(level);
-            sources.put(key, src);
+        if (src != null && src.level() != level) {
+            src.remove();
+            sources.remove(key);
+            src = null;
         }
-        V3 current = src.hasPosition() ? src.position() : null;
-        if (SourceMotion.shouldMove(current, pos, src.luminance(), luminance, BeamClientConfig.MOVE_THRESHOLD.get())) {
-            src.set(pos, luminance);
-            moved.add(key);
+        double displacement;
+        if (src != null && src.hasPosition()) {
+            double d = src.distSq(pos);
+            if (!SourceMotion.shouldMove(d, src.luminance(), luminance, BeamClientConfig.MOVE_THRESHOLD.get())) {
+                SodiumDynamicLights.updateTracking(src);
+                return;
+            }
+            int dl = luminance - src.luminance();
+            displacement = d + dl * dl;
+            SodiumDynamicLights.updateTracking(src);
+        } else {
+            displacement = APPEAR_DISPLACEMENT + luminance;
         }
-        SodiumDynamicLights.updateTracking(src);
+        Change c = change(key, pos, luminance, src, false);
+        scheduler.offer(key, priority, viewer.distSq(pos), displacement, c);
     }
 
     @Override
@@ -63,11 +101,49 @@ public final class SdlBackend implements LightBackend {
         ObjectIterator<Long2ObjectMap.Entry<BeamLightSource>> it = sources.long2ObjectEntrySet().fastIterator();
         while (it.hasNext()) {
             Long2ObjectMap.Entry<BeamLightSource> e = it.next();
-            if (!seen.contains(e.getLongKey())) {
-                e.getValue().remove();
-                it.remove();
-            }
+            if (seen.contains(e.getLongKey())) continue;
+            BeamLightSource src = e.getValue();
+            double dist = src.hasPosition() ? src.distSq(viewer) : 0;
+            scheduler.offer(e.getLongKey(), false, dist, APPEAR_DISPLACEMENT,
+                    change(e.getLongKey(), null, 0, src, true));
         }
+        deferred = scheduler.schedule(budget);
+        Level level = Minecraft.getInstance().level;
+        for (int i = 0; i < scheduler.size(); i++) {
+            if (!scheduler.allowed(i)) continue;
+            Change c = scheduler.payload(i);
+            if (c.removal) {
+                c.src.remove();
+                sources.remove(c.key);
+            } else {
+                BeamLightSource src = c.src;
+                if (src == null) {
+                    src = new BeamLightSource(level);
+                    sources.put(c.key, src);
+                }
+                src.set(c.pos, c.lum);
+                SodiumDynamicLights.updateTracking(src);
+            }
+            moved.add(c.key);
+        }
+        for (int i = 0; i < changeCount; i++) changePool.get(i).src = null;
+    }
+
+    private Change change(long key, V3 pos, int lum, BeamLightSource src, boolean removal) {
+        Change c;
+        if (changeCount < changePool.size()) {
+            c = changePool.get(changeCount);
+        } else {
+            c = new Change();
+            changePool.add(c);
+        }
+        changeCount++;
+        c.key = key;
+        c.pos = pos;
+        c.lum = lum;
+        c.src = src;
+        c.removal = removal;
+        return c;
     }
 
     @Override
@@ -76,11 +152,15 @@ public final class SdlBackend implements LightBackend {
         sources.clear();
         seen.clear();
         moved.clear();
+        scheduler.clear();
+        changeCount = 0;
+        deferred = 0;
     }
 
     @Override public int ownCount() { return sources.size(); }
     @Override public int totalCount() { return sdl.getLightSourcesCount(); }
     @Override public int movesThisTick() { return moved.size(); }
+    @Override public int deferredThisTick() { return deferred; }
     @Override public boolean movedThisTick(long key) { return moved.contains(key); }
 
     @Override

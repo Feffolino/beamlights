@@ -9,9 +9,14 @@ import it.ratlab.beamlights.api.math.V3;
 public interface LightBackend {
     String name();
 
-    void begin();
+    /**
+     * Starts a tick. viewer = camera/player position (distance ranking), moveBudget = max source changes applied
+     * this tick (0 = unlimited); the rest is deferred to later ticks.
+     */
+    void begin(V3 viewer, int moveBudget);
 
-    void put(long key, V3 pos, int luminance);
+    /** priority = local player's central ray: its changes are applied first. */
+    void put(long key, V3 pos, int luminance, boolean priority);
 
     void end();
 
@@ -24,6 +29,9 @@ public interface LightBackend {
     int totalCount();
 
     int movesThisTick();
+
+    /** Changes left for later ticks because the move budget was used up. */
+    int deferredThisTick();
 
     boolean movedThisTick(long key);
 

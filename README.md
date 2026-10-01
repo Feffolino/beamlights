@@ -9,6 +9,16 @@ Debug: `/beamlights status`, `/beamlights debug overlay on`, `/beamlights debug 
 Mod and pack developers: see [DEVELOPERS.md](DEVELOPERS.md) (Java API, `BeamCollectEvent`, the `beamlights:beam` item
 component, KubeJS, Maven artifacts).
 
+## Performance (0.8.0)
+
+The expensive part of dynamic light is not the beam tracing but Sodium re-meshing chunk sections every time a light
+source moves or changes brightness. The client config section `[performance]` limits those changes: `snapToBlock`
+(lights at block centers, default on), `maxMovesPerTick` (budget of light changes per tick, default 24, local
+player's beam first), `remoteUpdateInterval` (other emitters re-traced every N ticks, default 2), `lodDistance` (far
+emitters use only the central ray, default 24 blocks) and `mergeSameSection` (coarser midpoints, default off).
+`/beamlights perf` shows the settings and live counters (also in the debug overlay);
+`/beamlights perf preset quality|balanced|performance` switches all of them at once.
+
 ## Data-driven beams (0.7.0)
 
 Any item can emit a beam through a datapack file `data/<namespace>/beamlights/beams/<name>.json` (KubeJS packs can use

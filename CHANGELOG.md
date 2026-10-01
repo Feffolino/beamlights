@@ -13,6 +13,15 @@
 - KubeJS binding `BeamLights.beams(entity)`.
 - `maven-publish`: `./gradlew publish` writes `it.ratlab:beamlights:<version>` (main, `api`, `sources`, `javadoc`
   jars) to `build/repo` and `~/.m2`. New `DEVELOPERS.md`.
+- Performance (client config section `[performance]`), aimed at Sodium chunk-section rebuilds caused by light source
+  changes: `snapToBlock` (default true, sources at block centers, no change for sub-block motion),
+  `maxMovesPerTick` (default 24, global budget of moves/luminance changes/creations/removals per tick, pure
+  `core/MoveScheduler`: local central ray first, then aged, nearest, largest displacement), `remoteUpdateInterval`
+  (default 2, remote emitters re-traced every N ticks staggered by entity id, last points reused), `lodDistance`
+  (default 24, far emitters central ray only), `mergeSameSection` (default false); points in the same block are
+  always merged. Fewer per-tick allocations (reused lists, stream-free plan counts, reused smoother sets).
+- Overlay line `perf:` (moves applied/deferred, snap, LOD and reused emitters); `/beamlights perf [show]`,
+  `/beamlights perf snap|budget|interval|lod|sectionmerge <v>`, `/beamlights perf preset quality|balanced|performance`.
 
 ## 0.7.0 (unreleased)
 - Data-driven beams: datapack files `data/<ns>/beamlights/beams/*.json` (items or item tags, slots

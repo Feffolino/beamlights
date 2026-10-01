@@ -11,13 +11,14 @@ public final class NoopBackend implements LightBackend {
     }
 
     @Override public String name() { return "none"; }
-    @Override public void begin() { }
-    @Override public void put(long key, V3 pos, int luminance) { }
+    @Override public void begin(V3 viewer, int moveBudget) { }
+    @Override public void put(long key, V3 pos, int luminance, boolean priority) { }
     @Override public void end() { }
     @Override public void clear() { }
     @Override public int ownCount() { return 0; }
     @Override public int totalCount() { return -1; }
     @Override public int movesThisTick() { return 0; }
+    @Override public int deferredThisTick() { return 0; }
     @Override public boolean movedThisTick(long key) { return false; }
     @Override public String statusLine() { return reason; }
 }

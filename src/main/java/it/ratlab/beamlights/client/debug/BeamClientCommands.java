@@ -47,6 +47,7 @@ public final class BeamClientCommands {
                 .then(gamerule("spawns", BeamGameRules.BLOCK_SPAWNS_NAME))
                 .then(gamerule("attract", BeamGameRules.ATTRACT_MOBS_NAME))
                 .then(LayoutCommands.build())
+                .then(PerfCommands.build())
                 .then(smoothing())
                 .then(Commands.literal("debug")
                         .then(toggle("overlay", DebugState::setOverlay))
@@ -137,6 +138,7 @@ public final class BeamClientCommands {
         reply(c, "Sources: " + b.ownCount() + " own / " + (b.totalCount() < 0 ? "?" : b.totalCount()) + " engine total");
         reply(c, "Layout: " + BeamClientTicker.layoutLine() + " (/beamlights layout show)");
         reply(c, "Smoothing: " + smoothingLine() + " (/beamlights smoothing ...)");
+        reply(c, "Performance: " + PerfCommands.settingsLine() + " (/beamlights perf ...)");
         reply(c, "Server game rules: " + BeamGameRules.BLOCK_SPAWNS_NAME + ", " + BeamGameRules.ATTRACT_MOBS_NAME
                 + " (/beamlights spawns|attract [on|off])");
         reply(c, "Providers: " + BeamRegistry.INSTANCE.providerNames()

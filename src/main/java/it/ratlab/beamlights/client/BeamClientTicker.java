@@ -17,6 +17,7 @@ import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.LightSmoother;
 import it.ratlab.beamlights.core.RayLayout;
 import it.ratlab.beamlights.core.RaySpec;
+import it.ratlab.beamlights.core.SourceMotion;
 import it.ratlab.beamlights.api.math.V3;
 import it.ratlab.beamlights.data.BeamDefinitions;
 import it.ratlab.beamlights.world.LevelOcclusion;
@@ -33,7 +34,9 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Per tick: collect beams near the player, trace, plan light points, smooth them, feed the backend. */
 @EventBusSubscriber(modid = BeamLights.MOD_ID, value = Dist.CLIENT)
@@ -109,6 +112,7 @@ public final class BeamClientTicker {
 
     private static void safeClear() {
         SMOOTHER.clear();
+        EMITTER_CACHE.clear();
         if (backend == null) return;
         try {
             backend.clear();
@@ -165,8 +169,27 @@ public final class BeamClientTicker {
         return STATS.layout;
     }
 
+    /** Last traced light points of one emitter, reused between re-traces of remote emitters. */
+    private static final class EmitterCache {
+        final List<LightSmoother.Target> targets = new ArrayList<>();
+        final List<TracedBeam> frame = new ArrayList<>();
+        long lastSeen;
+        boolean traced;
+        boolean lod;
+    }
+
+    // Reused every tick (client thread only).
+    private static final Map<Integer, EmitterCache> EMITTER_CACHE = new HashMap<>();
+    private static final List<Entity> EMITTERS = new ArrayList<>();
+    private static final List<LightSmoother.Target> TARGETS = new ArrayList<>();
+    private static final List<Beam> BEAMS = new ArrayList<>();
+    private static final List<String> SOURCES = new ArrayList<>();
+    private static final List<V3> SHARED = new ArrayList<>();
+    private static long tickCounter;
+
     private static void tick(ClientLevel level, LocalPlayer player, LightBackend b) {
         long t0 = System.nanoTime();
+        long tick = ++tickCounter;
         STATS.beginTick();
         boolean capture = DebugState.overlay() || DebugState.render() || DebugState.dumpRequested();
         List<TracedBeam> frame = capture ? new ArrayList<>() : null;
@@ -175,21 +198,23 @@ public final class BeamClientTicker {
         double rangeSq = range * range;
         boolean others = BeamClientConfig.OTHER_PLAYERS.get();
         int maxSources = BeamClientConfig.MAX_SOURCES.get();
+        boolean snap = BeamClientConfig.SNAP_TO_BLOCK.get();
+        int interval = BeamClientConfig.REMOTE_UPDATE_INTERVAL.get();
+        double lod = BeamClientConfig.LOD_DISTANCE.get();
+        double lodSq = lod > 0 ? lod * lod : Double.POSITIVE_INFINITY;
+        boolean sectionMerge = BeamClientConfig.MERGE_SAME_SECTION.get();
         LightPointPlanner.Settings settings = new LightPointPlanner.Settings(
                 BeamClientConfig.MIDPOINTS.get(), BeamClientConfig.MID_SPACING.get(),
                 BeamClientConfig.MID_LUMINANCE_OFFSET.get(), BeamClientConfig.MAX_SOURCES_PER_BEAM.get(),
-                BeamClientConfig.MERGE_DISTANCE.get(), HIT_BACKOFF);
-        LightPointPlanner.Settings sideMid = new LightPointPlanner.Settings(
-                true, settings.midSpacing(), settings.midLuminanceOffset(),
-                settings.maxPerBeam(), settings.mergeDistance(), HIT_BACKOFF);
-        LightPointPlanner.Settings sideNoMid = new LightPointPlanner.Settings(
-                false, settings.midSpacing(), settings.midLuminanceOffset(),
-                settings.maxPerBeam(), settings.mergeDistance(), HIT_BACKOFF);
+                BeamClientConfig.MERGE_DISTANCE.get(), HIT_BACKOFF, sectionMerge);
+        LightPointPlanner.Settings settingsNoMid = settings.withMidpoints(false);
+        LightPointPlanner.Settings sideMid = settings.withMidpoints(true);
         List<RaySpec> layout = layout();
         int perEntity = BeamClientConfig.MAX_SOURCES_PER_ENTITY.get();
         LevelOcclusion occlusion = new LevelOcclusion(level);
 
-        List<Entity> emitters = new ArrayList<>();
+        List<Entity> emitters = EMITTERS;
+        emitters.clear();
         for (Entity e : level.entitiesForRendering()) {
             if (!BeamRegistry.INSTANCE.mayEmit(e)) continue;
             if (e != player) {
@@ -200,26 +225,43 @@ public final class BeamClientTicker {
         }
         emitters.sort(Comparator.comparingDouble(e -> e == player ? -1.0 : e.distanceToSqr(player)));
 
-        List<LightSmoother.Target> targets = new ArrayList<>();
-        List<Beam> beams = new ArrayList<>();
-        List<String> sources = new ArrayList<>();
-        List<V3> shared = new ArrayList<>();
+        List<LightSmoother.Target> targets = TARGETS;
+        targets.clear();
+        List<Beam> beams = BEAMS;
+        List<String> sources = capture ? SOURCES : null;
+        List<V3> shared = SHARED;
         for (Entity e : emitters) {
-            beams.clear();
-            sources.clear();
+            boolean local = e == player;
+            boolean reduced = !local && e.distanceToSqr(player) > lodSq;
+            EmitterCache cache = EMITTER_CACHE.computeIfAbsent(e.getId(), id -> new EmitterCache());
+            cache.lastSeen = tick;
+            if (reduced) STATS.lodEmitters++;
+            // Remote emitters: reuse the last points between re-traces (an LOD change forces a re-trace).
+            if (!local && cache.traced && cache.lod == reduced && !SourceMotion.remoteDue(e.getId(), tick, interval)) {
+                targets.addAll(cache.targets);
+                if (frame != null) frame.addAll(cache.frame);
+                STATS.reusedEmitters++;
+                continue;
+            }
+            cache.traced = true;
+            cache.lod = reduced;
+            cache.targets.clear();
+            cache.frame.clear();
             shared.clear();
             BeamRegistry.INSTANCE.collect(e, 1.0f, beams, sources);
             // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
             int entityUsed = 0;
-            // Pass 0: central rays of every beam, so they win the per-entity budget; pass 1: side rays.
-            for (int pass = 0; pass < 2; pass++) {
+            // Pass 0: central rays of every beam, so they win the per-entity budget; pass 1: side rays (not in LOD).
+            int passes = reduced ? 1 : 2;
+            for (int pass = 0; pass < passes; pass++) {
+                boolean side = pass == 1;
+                if (side && layout.isEmpty()) break;
                 for (int bi = 0; bi < beamCount; bi++) {
                     Beam beam = beams.get(bi);
-                    List<V3> dirs = pass == 0 ? List.of(beam.dir().normalize())
-                            : ConeRays.directions(beam.dir(), beam.coneDeg(), layout);
-                    for (int i = 0; i < dirs.size(); i++) {
-                        boolean side = pass == 1;
+                    List<V3> dirs = side ? ConeRays.directions(beam.dir(), beam.coneDeg(), layout) : null;
+                    int rays = side ? dirs.size() : 1;
+                    for (int i = 0; i < rays; i++) {
                         RaySpec spec = side ? layout.get(i) : null;
                         int lum = side ? Math.max(0, Math.min(15, beam.luminance() + spec.luminanceOffset()))
                                 : beam.luminance();
@@ -231,7 +273,8 @@ public final class BeamClientTicker {
                                 : beam;
                         BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(),
                                 occlusion);
-                        LightPointPlanner.Settings s = !side ? settings : spec.midpoints() ? sideMid : sideNoMid;
+                        LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)
+                                : spec.midpoints() ? sideMid : settingsNoMid;
                         LightPointPlanner.Plan plan = LightPointPlanner.plan(rayBeam.origin(), rayBeam.dir(), trace,
                                 lum, s, occlusion, shared, side);
                         STATS.addPlan(plan);
@@ -241,37 +284,48 @@ public final class BeamClientTicker {
                                 STATS.capped++;
                                 continue;
                             }
-                            targets.add(new LightSmoother.Target(Keys.of(e.getId(), ray, p.slot()), p.pos(),
+                            cache.targets.add(new LightSmoother.Target(Keys.of(e.getId(), ray, p.slot()), p.pos(),
                                     p.luminance()));
                             entityUsed++;
                         }
                         if (frame != null) {
-                            frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), sources.get(bi), e.getId(), ray, side,
-                                    rayBeam, trace, plan));
+                            String src = bi < sources.size() ? sources.get(bi) : "?";
+                            cache.frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), src, e.getId(),
+                                    ray, side, rayBeam, trace, plan));
                         }
                     }
                 }
             }
+            targets.addAll(cache.targets);
+            if (frame != null) frame.addAll(cache.frame);
         }
+        EMITTER_CACHE.values().removeIf(c -> c.lastSeen != tick);
 
         // Global cap on the smoothed output; ghosts come last, so they are the first to go.
         List<LightSmoother.Output> out = SMOOTHER.update(targets, new LightSmoother.Settings(
                 BeamClientConfig.SMOOTHING.get(), BeamClientConfig.SMOOTH_FACTOR.get(),
                 BeamClientConfig.JUMP_DISTANCE.get(), BeamClientConfig.FADE_TICKS.get()));
-        b.begin();
+        V3 viewer = new V3(player.getX(), player.getEyeY(), player.getZ());
+        b.begin(viewer, BeamClientConfig.MAX_MOVES_PER_TICK.get());
         int used = 0;
+        int localId = player.getId();
         for (LightSmoother.Output o : out) {
             if (used >= maxSources) {
                 if (!o.ghost()) STATS.globalCapped++;
                 continue;
             }
-            b.put(o.key(), o.pos(), o.luminance());
+            // Snapped lights only change when they enter another block; glide and fades still drive them.
+            V3 pos = snap ? SourceMotion.snapToBlock(o.pos()) : o.pos();
+            boolean priority = !o.ghost() && Keys.entityId(o.key()) == localId
+                    && Keys.ray(o.key()) % RAYS_PER_BEAM == 0;
+            b.put(o.key(), pos, o.luminance(), priority);
             used++;
             if (o.ghost()) STATS.ghosts++;
         }
         b.end();
 
-        STATS.endTick(System.nanoTime() - t0, b.movesThisTick());
+        STATS.snapped = snap;
+        STATS.endTick(System.nanoTime() - t0, b.movesThisTick(), b.deferredThisTick());
         DebugState.setLastFrame(frame != null ? frame : List.of());
         if (DebugState.consumeDump()) DebugDump.write(frame, b, player);
     }
