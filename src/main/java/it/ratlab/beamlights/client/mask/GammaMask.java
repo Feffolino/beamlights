@@ -77,8 +77,8 @@ public final class GammaMask {
     public static String statusLine() {
         String s = "mask: " + reason.text;
         if (reason == MaskPolicy.Reason.FAILED && !failure.isEmpty()) s += " (" + failure + ")";
-        if (reason == MaskPolicy.Reason.ACTIVE) s += String.format(java.util.Locale.ROOT, ", strength %.2f",
-                GammaMaskRenderer.currentStrength());
+        if (reason == MaskPolicy.Reason.ACTIVE) s += String.format(java.util.Locale.ROOT, ", strength %.2f, ",
+                GammaMaskRenderer.currentStrength()) + GammaMaskRenderer.diagnostics();
         return s;
     }
 }
