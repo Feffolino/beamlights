@@ -7,9 +7,6 @@
         },
         {
             "name": "DepthSampler"
-        },
-        {
-            "name": "LightSampler"
         }
     ],
     "uniforms": [
@@ -107,11 +104,11 @@
             ]
         },
         {
-            "name": "NightVision",
+            "name": "Gain",
             "type": "float",
             "count": 1,
             "values": [
-                1.0
+                5.0
             ]
         },
         {
@@ -144,15 +141,6 @@
             "count": 1,
             "values": [
                 0.015
-            ]
-        },
-        {
-            "name": "LightUV",
-            "type": "float",
-            "count": 2,
-            "values": [
-                0.03125,
-                0.03125
             ]
         }
     ]

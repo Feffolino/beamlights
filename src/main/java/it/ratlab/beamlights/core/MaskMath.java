@@ -43,14 +43,12 @@ public final class MaskMath {
     }
 
     /**
-     * One channel, night vision model: scene colour ~ texture * lightmap(light level), so dividing by the lightmap's
-     * largest channel (lightMax, what vanilla night vision normalises to) shows the texture as if fully lit.
-     * gain = 1 + (nightVision / lightMax - 1) * m, faded out for already bright pixels, then a soft knee; never darkens.
+     * One channel: multiplicative light (scene colour ~ albedo * ambient, so colour * (1 + gain * m) adds light and keeps
+     * texture contrast), faded out for already bright pixels (luma up to brightCutoff), then a soft knee.
      */
-    public static double light(double c, double luma, double m, double lightMax, double nightVision,
-                               double brightCutoff, double knee, double blackLift) {
-        double target = nightVision / Math.max(0.02, lightMax);
-        double g = Math.max(0, target - 1) * Math.min(1, m) * (1 - smoothstep(brightCutoff * 0.3, brightCutoff, luma));
+    public static double light(double c, double luma, double m, double gain, double brightCutoff, double knee,
+                               double blackLift) {
+        double g = gain * m * (1 - smoothstep(brightCutoff * 0.3, brightCutoff, luma));
         double base = Math.max(0, c);
         // Light only adds: the knee never darkens pixels that were already bright.
         return Math.max(base, softClip(base * (1 + g) + blackLift * m, knee));

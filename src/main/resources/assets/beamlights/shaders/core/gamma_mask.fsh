@@ -1,10 +1,8 @@
 #version 150
 
-// Beam mask: inside the beam cone surfaces look like under night vision (scene colour / lightmap max at the lit
-// point's light level). Mirrors it.ratlab.beamlights.core.MaskMath (mask, light, softClip).
+// Beam mask: adds light inside the beam cone. Mirrors it.ratlab.beamlights.core.MaskMath (mask, light, softClip).
 uniform sampler2D ColorSampler;
 uniform sampler2D DepthSampler;
-uniform sampler2D LightSampler; // vanilla lightmap
 
 uniform mat4 InvViewProj;  // inverse(projection * camera rotation): clip -> camera-relative world
 uniform vec3 BeamOrigin;   // camera-relative
@@ -14,8 +12,7 @@ uniform float CosInner;
 uniform float Range;
 uniform float Falloff;
 uniform float Strength;
-uniform float NightVision;
-uniform vec2 LightUV;
+uniform float Gain;
 uniform float Shading;
 uniform float Knee;
 uniform float BrightCutoff;
@@ -62,10 +59,7 @@ void main() {
     }
     vec3 c = max(color.rgb, vec3(0.0));
     float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    vec3 lm = texture(LightSampler, LightUV).rgb;
-    float lightMax = max(0.02, max(lm.r, max(lm.g, lm.b)));
-    float g = max(0.0, NightVision / lightMax - 1.0) * min(1.0, m)
-            * (1.0 - smoothstep(BrightCutoff * 0.3, BrightCutoff, luma));
+    float g = Gain * m * (1.0 - smoothstep(BrightCutoff * 0.3, BrightCutoff, luma));
     vec3 lit = c * (1.0 + g * Tint) + BlackLift * m * Tint;
     // Light only adds: the knee never darkens pixels that were already bright.
     fragColor = vec4(max(c, softClip(lit)), color.a);

@@ -284,28 +284,26 @@ public final class BeamClientConfig {
     public static final ModConfigSpec.DoubleValue MASK_STRENGTH = B
             .comment("Mask strength at full beam luminance (scaled by luminance/15).")
             .defineInRange("maskStrength", 1.0, 0.0, 3.0);
-    public static final ModConfigSpec.DoubleValue MASK_NIGHT_VISION = B
-            .comment("How far lit surfaces go toward the night vision look: the scene colour is divided by the",
-                    "lightmap value of the lit point's light level (same normalisation as vanilla night vision).",
-                    "1 = like night vision, above 1 = brighter.")
-            .defineInRange("maskNightVision", 1.0, 0.0, 3.0);
+    public static final ModConfigSpec.DoubleValue MASK_GAIN = B
+            .comment("Light added on the axis, as a multiplier of the scene colour: colour * (1 + maskGain * mask).",
+                    "Multiplying keeps texture contrast (like real light on the surface albedo).")
+            .defineInRange("maskGain", 5.0, 0.0, 20.0);
     public static final ModConfigSpec.DoubleValue MASK_SHADING = B
-            .comment("Extra surface angle shading from depth buffer normals: 0 = none (night vision keeps only the",
-                    "vanilla face shading), 1 = full Lambert.")
-            .defineInRange("maskShading", 0.0, 0.0, 1.0);
+            .comment("Surface angle shading from depth buffer normals: 0 = flat, 1 = full Lambert (faces turned away",
+                    "from the beam get no light).")
+            .defineInRange("maskShading", 0.6, 0.0, 1.0);
     public static final ModConfigSpec.DoubleValue MASK_KNEE = B
             .comment("Highlights above this level are compressed softly instead of clipping to white.")
             .defineInRange("maskKnee", 0.7, 0.3, 1.0);
     public static final ModConfigSpec.DoubleValue MASK_BRIGHT_CUTOFF = B
             .comment("Pixels already this bright (luma) get no extra light; the gain fades in below it.")
-            .defineInRange("maskBrightCutoff", 0.8, 0.1, 1.0);
+            .defineInRange("maskBrightCutoff", 0.65, 0.1, 1.0);
     public static final ModConfigSpec.DoubleValue MASK_AMBIENT_FADE = B
-            .comment("Extra fade when the camera stands in block or sky light: 0 = never, 1 = fully at light 15. Usually",
-                    "not needed: in daylight the lightmap is already near 1, so the night vision division does nothing.")
-            .defineInRange("maskAmbientFade", 0.0, 0.0, 1.0);
+            .comment("The mask fades out when the camera stands in block or sky light: 0 = never, 1 = fully at light 15.")
+            .defineInRange("maskAmbientFade", 0.8, 0.0, 1.0);
     public static final ModConfigSpec.DoubleValue MASK_BLACK_LIFT = B
             .comment("Tiny additive light so pure black surfaces show something.")
-            .defineInRange("maskBlackLift", 0.0, 0.0, 0.2);
+            .defineInRange("maskBlackLift", 0.015, 0.0, 0.2);
     public static final ModConfigSpec.DoubleValue MASK_ANGLE_SCALE = B
             .comment("Mask half-angle relative to the beam's cone half-angle.")
             .defineInRange("maskAngleScale", 1.0, 0.2, 3.0);
@@ -317,7 +315,7 @@ public final class BeamClientConfig {
             .defineInRange("maskRangeScale", 1.0, 0.1, 2.0);
     public static final ModConfigSpec.DoubleValue MASK_FALLOFF = B
             .comment("Distance falloff exponent of (1 - dist/range); 0 = flat.")
-            .defineInRange("maskFalloff", 0.35, 0.0, 4.0);
+            .defineInRange("maskFalloff", 0.7, 0.0, 4.0);
     public static final ModConfigSpec.DoubleValue MASK_TINT = B
             .comment("How much the beam colour tints the additive lift (0 = white).")
             .defineInRange("maskTint", 0.25, 0.0, 1.0);
