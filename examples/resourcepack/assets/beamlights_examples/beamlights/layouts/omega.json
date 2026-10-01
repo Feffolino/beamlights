@@ -1,0 +1,6 @@
+{
+  "providers": ["omegaflashlight"],
+  "indoor": "CENTER_ONLY",
+  "outdoor": "TRIANGLE",
+  "cone": true
+}

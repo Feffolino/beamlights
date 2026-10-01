@@ -248,9 +248,10 @@ public final class BeamClientConfig {
                     "the point lights remain.")
             .defineInRange("coneMaxDistanceForCone", 20.0, 4.0, 64.0);
     public static final ModConfigSpec.EnumValue<RayLayout.Pattern> OPEN_AREA_PATTERN = B
-            .comment("Side ray pattern used instead of rayPattern when ldlConeLight is on but a beam gets no cone",
-                    "(open area: hit farther than coneMaxDistanceForCone, or no hit). Same values as rayPattern;",
-                    "CENTER_ONLY = just the hit point. The other layout keys (sideRays, coneSpread, ...) apply.")
+            .comment("Outdoor side ray pattern: used instead of rayPattern (indoor) when the beam points into an open",
+                    "area (hit farther than coneMaxDistanceForCone, no hit, or open sky); no cone there. Same values as",
+                    "rayPattern; the other layout keys (sideRays, coneSpread, ...) apply. Per provider override:",
+                    "assets/<ns>/beamlights/layouts/*.json (indoor, outdoor, cone).")
             .defineEnum("openAreaPattern", RayLayout.Pattern.CENTER_ONLY);
     public static final ModConfigSpec.DoubleValue OPEN_AREA_HYSTERESIS = B
             .comment("Band (blocks) around coneMaxDistanceForCone: the beam turns open beyond max + this and back to",

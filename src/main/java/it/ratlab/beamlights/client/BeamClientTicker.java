@@ -18,6 +18,7 @@ import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.LightSmoother;
+import it.ratlab.beamlights.core.LayoutProfile;
 import it.ratlab.beamlights.core.MotionGovernor;
 import it.ratlab.beamlights.core.OpenAreaGate;
 import it.ratlab.beamlights.core.RayLayout;
@@ -164,23 +165,26 @@ public final class BeamClientTicker {
                              double rangeFactor) {
     }
 
-    private static LayoutKey openKey;
-    private static List<RaySpec> openLayout = List.of();
+    private static final Map<LayoutKey, List<RaySpec>> PATTERN_LAYOUTS = new HashMap<>();
 
-    /** Side rays for beams without a cone (open area) while the LDL cone light is on: openAreaPattern. */
-    private static List<RaySpec> openLayout() {
+    /**
+     * Side rays for a given pattern with the other layout keys of the config (openAreaPattern, layout profiles).
+     * Cached per key; the cache is dropped when the config layout keys change.
+     */
+    private static List<RaySpec> layoutFor(RayLayout.Pattern pattern) {
         layout();
         LayoutKey base = layoutKey;
-        LayoutKey k = new LayoutKey(BeamClientConfig.OPEN_AREA_PATTERN.get(), base.sideRays(), base.spread(),
-                base.rollOffset(), base.innerRays(), base.innerSpread(), base.custom(), base.lumOffset(),
-                base.midpoints(), base.rangeFactor());
-        if (k.equals(layoutKey)) return cachedLayout;
-        if (!k.equals(openKey)) {
-            openKey = k;
-            openLayout = RayLayout.build(k.pattern(), k.sideRays(), k.spread(), k.rollOffset(), k.innerRays(),
+        if (pattern == base.pattern()) return cachedLayout;
+        LayoutKey k = new LayoutKey(pattern, base.sideRays(), base.spread(), base.rollOffset(), base.innerRays(),
+                base.innerSpread(), base.custom(), base.lumOffset(), base.midpoints(), base.rangeFactor());
+        List<RaySpec> l = PATTERN_LAYOUTS.get(k);
+        if (l == null) {
+            if (PATTERN_LAYOUTS.size() > 32) PATTERN_LAYOUTS.clear();
+            l = RayLayout.build(k.pattern(), k.sideRays(), k.spread(), k.rollOffset(), k.innerRays(),
                     k.innerSpread(), k.custom(), k.lumOffset(), k.midpoints(), k.rangeFactor());
+            PATTERN_LAYOUTS.put(k, l);
         }
-        return openLayout;
+        return l;
     }
 
     private static List<RaySpec> layout() {
@@ -283,7 +287,8 @@ public final class BeamClientTicker {
         LightPointPlanner.Settings settingsNoMid = settings.withMidpoints(false);
         LightPointPlanner.Settings sideMid = settings.withMidpoints(true);
         List<RaySpec> layout = layout();
-        List<RaySpec> open = openLayout();
+        RayLayout.Pattern indoorDefault = BeamClientConfig.RAY_PATTERN.get();
+        RayLayout.Pattern outdoorDefault = BeamClientConfig.OPEN_AREA_PATTERN.get();
         int perEntity = BeamClientConfig.MAX_SOURCES_PER_ENTITY.get();
         LevelOcclusion occlusion = new LevelOcclusion(level);
         MotionGovernor.Settings motion = BeamClientConfig.motionSettings();
@@ -298,7 +303,6 @@ public final class BeamClientTicker {
                 coneSettings.apexHysteresis(), coneSettings.angleHysteresisDeg(), coneSettings.freezeWhenFast());
         OpenAreaGate.Settings openSettings = BeamClientConfig.openAreaSettings();
         int openFadeTicks = BeamClientConfig.OPEN_AREA_FADE_TICKS.get();
-        if (!cones) STATS.area = "cone light off";
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -315,7 +319,8 @@ public final class BeamClientTicker {
         List<LightSmoother.Target> targets = TARGETS;
         targets.clear();
         List<Beam> beams = BEAMS;
-        List<String> sources = capture ? SOURCES : null;
+        // Provider name per beam: always collected (layout profiles), cheap.
+        List<String> sources = SOURCES;
         List<V3> shared = SHARED;
         for (Entity e : emitters) {
             boolean local = e == player;
@@ -353,8 +358,13 @@ public final class BeamClientTicker {
                 boolean side = pass == 1;
                 for (int bi = 0; bi < beamCount; bi++) {
                     Beam beam = beams.get(bi);
-                    boolean useOpen = cones && (openBits & (1L << bi)) != 0;
-                    List<RaySpec> beamLayout = useOpen ? open : layout;
+                    LayoutProfile profile = LayoutProfiles.INSTANCE.get(bi < sources.size() ? sources.get(bi) : null);
+                    boolean beamCones = cones && (profile == null || profile.coneOr(true));
+                    boolean useOpen = (openBits & (1L << bi)) != 0;
+                    RayLayout.Pattern pattern = useOpen
+                            ? (profile != null ? profile.outdoorOr(outdoorDefault) : outdoorDefault)
+                            : (profile != null ? profile.indoorOr(indoorDefault) : indoorDefault);
+                    List<RaySpec> beamLayout = pattern == indoorDefault ? layout : layoutFor(pattern);
                     int fade = useOpen && side
                             ? OpenAreaGate.fadeOffset(cache.gates[bi].held(), openFadeTicks, OPEN_FADE_DIM) : 0;
                     if (side && beamLayout.isEmpty()) continue;
@@ -372,7 +382,8 @@ public final class BeamClientTicker {
                                 : beam;
                         BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(),
                                 occlusion);
-                        if (cones && !side) {
+                        if (!side) {
+                            // Open area gate for every central ray (picks indoor / outdoor layout); cone only if on.
                             int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
                             OpenAreaGate gate = cache.gates[bi];
                             if (gate == null) gate = cache.gates[bi] = new OpenAreaGate();
@@ -381,18 +392,24 @@ public final class BeamClientTicker {
                             if (isOpen) openBits |= 1L << bi;
                             if (local && bi == 0) {
                                 STATS.area = String.format(java.util.Locale.ROOT,
-                                        "%s for %d t (hit %s, sky %d, cone below %.0f / open above %.0f%s)",
-                                        isOpen ? "OPEN -> " + BeamClientConfig.OPEN_AREA_PATTERN.get() : "CONE",
+                                        "%s for %d t (hit %s, sky %d, indoor below %.0f / open above %.0f%s)%s",
+                                        isOpen ? "OPEN -> " + (profile != null ? profile.outdoorOr(outdoorDefault)
+                                                : outdoorDefault)
+                                                : "INDOOR -> " + (profile != null ? profile.indoorOr(indoorDefault)
+                                                : indoorDefault) + (beamCones ? " + cone" : ""),
                                         gate.held(), trace.hit() ? String.format(java.util.Locale.ROOT, "%.1f",
                                                 trace.distance()) : "none", sky,
                                         openSettings.maxDistance() - openSettings.hysteresis(),
                                         openSettings.maxDistance() + openSettings.hysteresis(),
-                                        openSettings.skyOpen() ? ", sky >= " + openSettings.skyLight() : "");
+                                        openSettings.skyOpen() ? ", sky >= " + openSettings.skyLight() : "",
+                                        profile != null ? " [profile " + sources.get(bi) + "]" : "");
                             }
-                            ConeLight.Shape shape = isOpen ? null : ConePolicy.target(rayBeam.origin(), rayBeam.dir(),
-                                    trace.hit(), trace.distance(), HIT_BACKOFF, beam.coneDeg(), coneLum,
-                                    coneNoDistance);
-                            cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT), shape));
+                            if (beamCones) {
+                                ConeLight.Shape shape = isOpen ? null : ConePolicy.target(rayBeam.origin(),
+                                        rayBeam.dir(), trace.hit(), trace.distance(), HIT_BACKOFF, beam.coneDeg(),
+                                        coneLum, coneNoDistance);
+                                cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT), shape));
+                            }
                         }
                         LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)
                                 : spec.midpoints() ? sideMid : settingsNoMid;
