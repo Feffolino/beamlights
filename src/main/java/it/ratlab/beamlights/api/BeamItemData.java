@@ -3,20 +3,18 @@ package it.ratlab.beamlights.api;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import io.netty.buffer.ByteBuf;
 import it.ratlab.beamlights.core.BeamDefinition;
 import it.ratlab.beamlights.core.BeamValues;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Value of the item data component {@code beamlights:beam} ({@link BeamLightsApi#beamComponent()}): gives one
- * ItemStack a beam without a datapack. Same fields as a datapack definition minus items, condition and priority. In
- * the slots it lists, the component wins over datapack definitions (luminance 0 turns the beam off). Persistent (saved
- * with the stack) and synced to clients. Immutable.
+ * Beam data of one ItemStack, stored in the vanilla {@code minecraft:custom_data} component under the key
+ * {@code beamlights:beam} ({@link BeamLightsApi#getBeam}, {@link BeamLightsApi#setBeam}): gives the stack a beam
+ * without a datapack. Same fields as a datapack definition minus items, condition and priority. In the slots it
+ * lists, it wins over datapack definitions (luminance 0 turns the beam off). Saved with the stack and synced like any
+ * custom data; the mod is not needed on the other side. Immutable.
  *
  * <p>NBT / JSON form: {@code {luminance: 12, range: 20.0, cone: 25.0, color: "#FFE8B0",
  * origin: {forward: 0.3, down: 0.2}, slots: ["mainhand", "offhand"]}}; only luminance is required.
@@ -65,7 +63,7 @@ public record BeamItemData(int luminance, float range, float cone, int color, do
         ).apply(i, Origin::new));
     }
 
-    /** Persistent codec (NBT, JSON, KubeJS objects), validated. */
+    /** Codec (NBT, JSON, KubeJS objects), validated. */
     public static final Codec<BeamItemData> CODEC = RecordCodecBuilder.<BeamItemData>create(i -> i.group(
             Codec.INT.fieldOf("luminance").forGetter(BeamItemData::luminance),
             Codec.FLOAT.optionalFieldOf("range", BeamDefinition.DEFAULT_RANGE).forGetter(BeamItemData::range),
@@ -76,9 +74,6 @@ public record BeamItemData(int luminance, float range, float cone, int color, do
     ).apply(i, (lum, range, cone, color, origin, slots) ->
             new BeamItemData(lum, range, cone, color, origin.forward(), origin.down(), slots)))
             .validate(BeamItemData::validate);
-
-    /** Network codec (via the persistent codec). */
-    public static final StreamCodec<ByteBuf, BeamItemData> STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
 
     private static DataResult<BeamItemData> validate(BeamItemData d) {
         String err = BeamValues.check(d.luminance, d.range, d.cone, d.forward, d.down, d.slots);

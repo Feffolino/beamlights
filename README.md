@@ -59,7 +59,13 @@ hands and head. Omega Flashlight items are skipped (native support). Examples in
 
 Other mods register a `BeamProvider` with `BeamLightsApi.register(provider)` in common setup, on both sides (the client
 uses beams for light, the server for spawn blocking and mob attraction), or edit beams in `BeamCollectEvent`. A single
-stack gets a beam with the item component `beamlights:beam` (same fields as above, e.g.
-`/give @s lantern[beamlights:beam={luminance:12}]`). With KubeJS installed, scripts get the binding
-`BeamLights.isBeamActive(entity)`, `BeamLights.beamCount(entity)` and `BeamLights.beams(entity)` (beams of the entity
-right now, on the entity's side). Details in [DEVELOPERS.md](DEVELOPERS.md).
+stack gets a beam with the vanilla `custom_data` component under the key `beamlights:beam` (same fields as above, e.g.
+`/give @s minecraft:lantern[minecraft:custom_data={"beamlights:beam":{luminance:12,range:16,cone:35}}]`, the loot
+function `set_custom_data`, or `BeamLights.setBeam(item, {luminance: 12})` in KubeJS). With KubeJS installed, scripts
+also get `BeamLights.isBeamActive(entity)`, `BeamLights.beamCount(entity)`, `BeamLights.beams(entity)` (beams of the
+entity right now, on the entity's side), `BeamLights.getBeam(item)` and `BeamLights.clearBeam(item)`.
+
+Beam Lights is optional on both sides: it registers nothing in a synced registry, so a client with the mod can join a
+server without it and the other way round. A client-only install gives dynamic light for items the client already
+knows (e.g. Omega flashlights, `custom_data` items); server features (spawn blocking, mob attraction, datapack
+definitions) need the mod on the server. Details in [DEVELOPERS.md](DEVELOPERS.md).

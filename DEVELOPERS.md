@@ -44,8 +44,8 @@ Optional dependency in `neoforge.mods.toml`:
 With an optional dependency, only touch Beam Lights classes after `ModList.get().isLoaded("beamlights")`, from a
 class that is not loaded otherwise (the usual "compat class" pattern).
 
-Note: the `beamlights:beam` item component is a registry entry, and NeoForge syncs the data component registry. A
-client therefore needs Beam Lights to join a server that has it (since 0.8.0).
+Beam Lights registers nothing in a synced registry (item beam data lives in `minecraft:custom_data`), so it is
+optional on both sides: a client with the mod can join a server without it and the other way round.
 
 ## BeamProvider (code decides every tick)
 
@@ -91,10 +91,10 @@ static void onBeams(BeamCollectEvent event) {
 }
 ```
 
-## Item data component `beamlights:beam` (one stack, no datapack)
+## Item beam data `beamlights:beam` in `custom_data` (one stack, no datapack)
 
 Same fields as a datapack definition (minus items, condition, priority). Only `luminance` is required. In the slots
-it lists, the component wins over datapack definitions; `luminance: 0` turns a stack's beam off.
+it lists, it wins over datapack definitions; `luminance: 0` turns a stack's beam off.
 
 | Field | Default | Range |
 |---|---|---|
@@ -108,25 +108,32 @@ it lists, the component wins over datapack definitions; `luminance: 0` turns a s
 Java:
 
 ```java
-stack.set(BeamLightsApi.beamComponent(),
+BeamLightsApi.setBeam(stack,
         new BeamItemData(12, 20f, 25f, 0xFFE8B0, 0.3, 0.2, List.of("mainhand", "head")));
-stack.set(BeamLightsApi.beamComponent(), BeamItemData.of(10)); // defaults
+BeamLightsApi.setBeam(stack, BeamItemData.of(10)); // defaults
+Optional<BeamItemData> beam = BeamLightsApi.getBeam(stack);
+BeamLightsApi.clearBeam(stack);
 ```
 
 KubeJS:
 
 ```js
 // e.g. in a recipe result or a player event
-item.set('beamlights:beam', { luminance: 12, range: 20, color: '#FFE8B0', slots: ['mainhand', 'head'] })
+BeamLights.setBeam(item, { luminance: 12, range: 20, color: '#FFE8B0', slots: ['mainhand', 'head'] })
+BeamLights.getBeam(item)   // BeamItemData or null
+BeamLights.clearBeam(item)
 ```
 
 Command:
 
 ```
-/give @s minecraft:lantern[beamlights:beam={luminance:12,range:20f,color:"#FFE8B0",slots:["mainhand","offhand"]}]
+/give @s minecraft:lantern[minecraft:custom_data={"beamlights:beam":{luminance:12,range:20f,color:"#FFE8B0",slots:["mainhand","offhand"]}}]
 ```
 
-Invalid values are rejected by the codec (the command fails with a readable reason).
+Loot tables: function `minecraft:set_custom_data` with `"tag": "{\"beamlights:beam\":{luminance:12}}"`.
+
+`custom_data` is not validated on write by the game: invalid beam data is ignored on read (logged once per distinct
+error). `setBeam` from Java/KubeJS validates and throws.
 
 ## Threading and sides
 

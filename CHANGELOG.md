@@ -1,8 +1,15 @@
 # Changelog
 
+## 0.8.1 (unreleased)
+- Beam item data moved from the registered data component `beamlights:beam` to the vanilla `minecraft:custom_data`
+  component, key `"beamlights:beam"` (same fields). The mod registers nothing in a synced registry again, so it is
+  optional on both sides. API: `beamComponent()` replaced by `getBeam/setBeam/clearBeam(ItemStack)`; KubeJS
+  `BeamLights.setBeam/getBeam/clearBeam(item)`; `BeamItemData.STREAM_CODEC` removed. Decoded data is cached per
+  CustomData instance; invalid data is ignored and logged once per message.
+
 ## 0.8.0 (unreleased)
 - Public API (package `it.ratlab.beamlights.api`, `API_VERSION = 1`): `BeamLightsApi.register/unregister`,
-  `isBeamActive(entity)`, `getBeams(entity)` (snapshot), `providerNames()`, `beamComponent()`; Javadoc on every API
+  `isBeamActive(entity)`, `getBeams(entity)` (snapshot), `providerNames()`, `getBeam/setBeam/clearBeam(stack)`; Javadoc on every API
   type. `V3` moved from `core.math` to `api.math` (the API jar is self-contained). `Beam.of(Vec3, ...)` and
   `withLuminance/withRange/withRgb` helpers.
 - `BeamCollectEvent` (`api.event`, NeoForge game bus, both sides): posted after the providers ran for an entity, with

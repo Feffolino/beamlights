@@ -1,19 +1,20 @@
 package it.ratlab.beamlights.api;
 
 import it.ratlab.beamlights.core.BeamRegistry;
-import it.ratlab.beamlights.data.BeamComponents;
-import net.minecraft.core.component.DataComponentType;
+import it.ratlab.beamlights.core.BeamItems;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Public entry point for other mods. Package {@code it.ratlab.beamlights.api} and its subpackages are the stable API;
  * everything else is internal and may change between versions.
  *
- * <p>Ways to add a beam: a {@link BeamProvider} (code decides per tick), the item data component
- * {@code beamlights:beam} ({@link #beamComponent()}, one stack), a datapack JSON
+ * <p>Ways to add a beam: a {@link BeamProvider} (code decides per tick), the item data
+ * {@code beamlights:beam} in {@code minecraft:custom_data} ({@link #setBeam}, one stack), a datapack JSON
  * (data/&lt;ns&gt;/beamlights/beams/*.json, item ids or tags), or the
  * {@link it.ratlab.beamlights.api.event.BeamCollectEvent} (edit what the providers produced).
  */
@@ -66,10 +67,23 @@ public final class BeamLightsApi {
     }
 
     /**
-     * The {@code beamlights:beam} item data component type (persistent, synced). Available once registries are
-     * frozen (not during mod construction): {@code stack.set(BeamLightsApi.beamComponent(), BeamItemData.of(12))}.
+     * The beam stored in the stack's {@code minecraft:custom_data} under {@code "beamlights:beam"}; empty when absent
+     * or invalid. Works on both sides and does not require Beam Lights on the other side. Cached, cheap to call.
      */
-    public static DataComponentType<BeamItemData> beamComponent() {
-        return BeamComponents.BEAM.get();
+    public static Optional<BeamItemData> getBeam(ItemStack stack) {
+        return BeamItems.get(stack);
+    }
+
+    /**
+     * Stores the beam in the stack's {@code minecraft:custom_data} (other custom data is kept). Works on both sides and
+     * does not require Beam Lights on the other side; e.g. {@code setBeam(stack, BeamItemData.of(12))}.
+     */
+    public static void setBeam(ItemStack stack, BeamItemData beam) {
+        BeamItems.set(stack, beam);
+    }
+
+    /** Removes the beam data from the stack (other custom data is kept). Works on both sides. */
+    public static void clearBeam(ItemStack stack) {
+        BeamItems.clear(stack);
     }
 }
