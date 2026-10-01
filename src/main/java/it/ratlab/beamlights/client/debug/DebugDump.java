@@ -5,7 +5,7 @@ import it.ratlab.beamlights.client.LightBackend;
 import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
 

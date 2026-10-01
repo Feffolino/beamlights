@@ -2,7 +2,7 @@ package it.ratlab.beamlights.core;
 
 import com.google.gson.JsonParser;
 import it.ratlab.beamlights.core.BeamDefinition.Slot;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

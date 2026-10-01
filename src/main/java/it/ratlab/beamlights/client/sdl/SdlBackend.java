@@ -3,7 +3,7 @@ package it.ratlab.beamlights.client.sdl;
 import it.ratlab.beamlights.client.LightBackend;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.SourceMotion;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;

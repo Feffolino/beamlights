@@ -2,6 +2,7 @@ plugins {
     id 'java-library'
     id 'net.neoforged.moddev' version '2.0.147'
     id 'idea'
+    id 'maven-publish'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -16,6 +17,11 @@ base {
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
 
 neoForge {
     version = project.neo_version
@@ -100,4 +106,40 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('jar', Jar).configure {
     from('LICENSE')
+}
+
+// Javadoc covers the public API only (it/ratlab/beamlights/api/**).
+tasks.named('javadoc', Javadoc).configure {
+    include 'it/ratlab/beamlights/api/**'
+    options.encoding = 'UTF-8'
+    (options as StandardJavadocDocletOptions).addStringOption('Xdoclint:none', '-quiet')
+}
+
+// Compile-only jar for other mods: just the API classes (the full jar is needed at runtime).
+var apiJar = tasks.register('apiJar', Jar) {
+    archiveClassifier = 'api'
+    from(sourceSets.main.output) {
+        include 'it/ratlab/beamlights/api/**'
+    }
+    from('LICENSE')
+}
+tasks.named('assemble') { dependsOn apiJar }
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            groupId = 'it.ratlab'
+            artifactId = mod_id
+            version = mod_version
+            from components.java
+            artifact apiJar
+        }
+    }
+    repositories {
+        maven {
+            name = 'buildRepo'
+            url = layout.buildDirectory.dir('repo')
+        }
+        mavenLocal()
+    }
 }

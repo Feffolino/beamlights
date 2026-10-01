@@ -1,6 +1,6 @@
 package it.ratlab.beamlights.client.sdl;
 
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;

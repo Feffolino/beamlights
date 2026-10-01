@@ -6,6 +6,9 @@ path along the way through Sodium Dynamic Lights. Native Omega Flashlight suppor
 Build: `JAVA_HOME="/c/Program Files/Java/jdk-25" ./gradlew build` (jar in `build/libs/`).
 Debug: `/beamlights status`, `/beamlights debug overlay on`, `/beamlights debug render on`, `/beamlights debug dump`.
 
+Mod and pack developers: see [DEVELOPERS.md](DEVELOPERS.md) (Java API, `BeamCollectEvent`, the `beamlights:beam` item
+component, KubeJS, Maven artifacts).
+
 ## Data-driven beams (0.7.0)
 
 Any item can emit a beam through a datapack file `data/<namespace>/beamlights/beams/<name>.json` (KubeJS packs can use
@@ -42,9 +45,11 @@ At most two data beams per entity. Players use every listed slot; other living e
 hands and head. Omega Flashlight items are skipped (native support). Examples in `examples/datapack` (copy it into
 `datapacks/`): a held lantern, and a renamed leather helmet that works as a helmet lamp.
 
-### Java API and KubeJS
+### Java API, item component and KubeJS
 
 Other mods register a `BeamProvider` with `BeamLightsApi.register(provider)` in common setup, on both sides (the client
-uses beams for light, the server for spawn blocking and mob attraction). With KubeJS installed, scripts get the binding
-`BeamLights.isBeamActive(entity)` and `BeamLights.beamCount(entity)` (lit beams of the entity right now, on the
-entity's side).
+uses beams for light, the server for spawn blocking and mob attraction), or edit beams in `BeamCollectEvent`. A single
+stack gets a beam with the item component `beamlights:beam` (same fields as above, e.g.
+`/give @s lantern[beamlights:beam={luminance:12}]`). With KubeJS installed, scripts get the binding
+`BeamLights.isBeamActive(entity)`, `BeamLights.beamCount(entity)` and `BeamLights.beams(entity)` (beams of the entity
+right now, on the entity's side). Details in [DEVELOPERS.md](DEVELOPERS.md).

@@ -6,6 +6,7 @@ import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.config.BeamServerConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.DataBeamProvider;
+import it.ratlab.beamlights.data.BeamComponents;
 import it.ratlab.beamlights.server.BeamGameRules;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -23,6 +24,7 @@ public final class BeamLights {
     public BeamLights(IEventBus modBus, ModContainer container) {
         container.registerConfig(ModConfig.Type.CLIENT, BeamClientConfig.SPEC);
         container.registerConfig(ModConfig.Type.SERVER, BeamServerConfig.SPEC);
+        BeamComponents.REGISTER.register(modBus);
         modBus.addListener(BeamLights::onCommonSetup);
     }
 

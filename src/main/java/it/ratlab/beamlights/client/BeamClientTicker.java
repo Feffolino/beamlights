@@ -17,7 +17,7 @@ import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.LightSmoother;
 import it.ratlab.beamlights.core.RayLayout;
 import it.ratlab.beamlights.core.RaySpec;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import it.ratlab.beamlights.data.BeamDefinitions;
 import it.ratlab.beamlights.world.LevelOcclusion;
 import net.minecraft.client.Minecraft;
@@ -208,10 +208,7 @@ public final class BeamClientTicker {
             beams.clear();
             sources.clear();
             shared.clear();
-            BeamRegistry.INSTANCE.collectNamed(e, 1.0f, (src, beam) -> {
-                sources.add(src);
-                beams.add(beam);
-            });
+            BeamRegistry.INSTANCE.collect(e, 1.0f, beams, sources);
             // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
             int entityUsed = 0;

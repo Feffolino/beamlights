@@ -1,6 +1,6 @@
 package it.ratlab.beamlights.core;
 
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 
 /** Decides when a light source is worth moving: every move costs chunk rebuilds in the backend. */
 public final class SourceMotion {

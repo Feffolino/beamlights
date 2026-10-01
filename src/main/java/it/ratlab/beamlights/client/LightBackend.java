@@ -1,6 +1,6 @@
 package it.ratlab.beamlights.client;
 
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 
 /**
  * Receives the light points of one tick: begin(), put() for every point, end() removes keys not put this tick.

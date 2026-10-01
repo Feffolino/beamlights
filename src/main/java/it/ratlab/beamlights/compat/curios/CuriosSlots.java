@@ -13,6 +13,11 @@ public final class CuriosSlots {
     private CuriosSlots() {
     }
 
+    /** True when any Curios slot holds a stack that passes the filter. */
+    public static boolean any(LivingEntity entity, Predicate<ItemStack> filter) {
+        return CuriosApi.getCuriosInventory(entity).map(h -> h.findFirstCurio(filter).isPresent()).orElse(false);
+    }
+
     /** Stacks in any Curios slot that pass the filter (empty list without a Curios inventory). */
     public static List<ItemStack> find(LivingEntity entity, Predicate<ItemStack> filter) {
         return CuriosApi.getCuriosInventory(entity)

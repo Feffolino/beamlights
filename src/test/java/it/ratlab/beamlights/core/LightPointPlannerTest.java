@@ -2,7 +2,7 @@ package it.ratlab.beamlights.core;
 
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

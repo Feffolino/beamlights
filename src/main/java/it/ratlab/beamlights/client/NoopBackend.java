@@ -1,6 +1,6 @@
 package it.ratlab.beamlights.client;
 
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 
 /** Used when no light engine is available; carries the reason for /beamlights status. */
 public final class NoopBackend implements LightBackend {

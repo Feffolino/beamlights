@@ -1,6 +1,6 @@
 package it.ratlab.beamlights.core;
 
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 
 /** Voxel ray march (Amanatides-Woo). Stops on the first block the test rejects; the start voxel is never tested. */
 public final class BeamTracer {

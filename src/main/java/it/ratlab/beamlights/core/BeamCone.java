@@ -1,6 +1,6 @@
 package it.ratlab.beamlights.core;
 
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 
 /** Point-in-beam tests used by server spawn blocking. */
 public final class BeamCone {

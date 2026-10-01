@@ -2,7 +2,7 @@ package it.ratlab.beamlights.world;
 
 import it.ratlab.beamlights.core.BeamTracer;
 import it.ratlab.beamlights.core.LightPointPlanner;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 

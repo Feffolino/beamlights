@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+- Public API (package `it.ratlab.beamlights.api`, `API_VERSION = 1`): `BeamLightsApi.register/unregister`,
+  `isBeamActive(entity)`, `getBeams(entity)` (snapshot), `providerNames()`, `beamComponent()`; Javadoc on every API
+  type. `V3` moved from `core.math` to `api.math` (the API jar is self-contained). `Beam.of(Vec3, ...)` and
+  `withLuminance/withRange/withRgb` helpers.
+- `BeamCollectEvent` (`api.event`, NeoForge game bus, both sides): posted after the providers ran for an entity, with
+  a mutable beam list; listener errors are logged once.
+- Item data component `beamlights:beam` (persistent, synced; luminance, range, cone, color, origin, slots), checked
+  before datapack definitions. Settable from Java, KubeJS (`item.set('beamlights:beam', {...})`) and `/give`. Because
+  the component registry is synced, clients now need Beam Lights to join a server that has it.
+- KubeJS binding `BeamLights.beams(entity)`.
+- `maven-publish`: `./gradlew publish` writes `it.ratlab:beamlights:<version>` (main, `api`, `sources`, `javadoc`
+  jars) to `build/repo` and `~/.m2`. New `DEVELOPERS.md`.
+
 ## 0.7.0 (unreleased)
 - Data-driven beams: datapack files `data/<ns>/beamlights/beams/*.json` (items or item tags, slots
   mainhand/offhand/head/curios, luminance, range, cone, colour, optional data component condition `present`/`equals`,

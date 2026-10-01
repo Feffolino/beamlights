@@ -5,7 +5,7 @@ import it.ratlab.beamlights.api.Beam;
 import it.ratlab.beamlights.config.BeamServerConfig;
 import it.ratlab.beamlights.core.BeamCone;
 import it.ratlab.beamlights.core.BeamRegistry;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import it.ratlab.beamlights.world.LevelOcclusion;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -92,10 +92,9 @@ public final class SpawnBlocker {
             cacheTick = tick;
         }
         return CACHE.computeIfAbsent(e.getId(), id -> {
-            List<Beam> lit = new ArrayList<>();
-            BeamRegistry.INSTANCE.collect(e, 1.0f, b -> {
-                if (b.luminance() > 0) lit.add(b);
-            });
+            List<Beam> lit = new ArrayList<>(2);
+            BeamRegistry.INSTANCE.collect(e, 1.0f, lit, null);
+            lit.removeIf(b -> b.luminance() <= 0);
             return lit;
         });
     }

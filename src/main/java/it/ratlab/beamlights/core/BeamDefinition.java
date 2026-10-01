@@ -4,7 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,9 +28,16 @@ public record BeamDefinition(List<String> items, List<Slot> slots, int luminance
     public enum Slot {
         MAINHAND, OFFHAND, HEAD, CURIOS;
 
+        private final String id = name().toLowerCase(Locale.ROOT);
+
+        /** Lower case id as used in JSON and the item component. */
+        public String id() {
+            return id;
+        }
+
         public static Slot parse(String s) {
             for (Slot v : values()) {
-                if (v.name().toLowerCase(Locale.ROOT).equals(s)) return v;
+                if (v.id.equals(s)) return v;
             }
             throw new IllegalArgumentException("unknown slot '" + s + "' (mainhand, offhand, head, curios)");
         }
@@ -93,6 +100,12 @@ public record BeamDefinition(List<String> items, List<Slot> slots, int luminance
 
     /** Beam start: eye + look * forward, moved down by 'down' blocks (world up axis). */
     public V3 origin(V3 eye, V3 look) {
+        return origin(eye, look, forward, down);
+    }
+
+    /** Beam start for explicit offsets (item component). */
+    public static V3 origin(V3 eye, V3 look, double forward, double down) {
+        if (forward == 0 && down == 0) return eye;
         return eye.add(look.normalize().scale(forward)).sub(new V3(0, down, 0));
     }
 

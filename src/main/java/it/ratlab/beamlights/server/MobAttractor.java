@@ -6,7 +6,7 @@ import it.ratlab.beamlights.config.BeamServerConfig;
 import it.ratlab.beamlights.core.AttractTarget;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import it.ratlab.beamlights.world.LevelOcclusion;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -67,10 +67,12 @@ public final class MobAttractor {
         }
 
         List<Beam> beams = new ArrayList<>();
+        List<Beam> collected = new ArrayList<>(2);
         for (Entity e : emitters.values()) {
-            BeamRegistry.INSTANCE.collect(e, 1.0f, b -> {
+            BeamRegistry.INSTANCE.collect(e, 1.0f, collected, null);
+            for (Beam b : collected) {
                 if (b.luminance() > 0) beams.add(b);
-            });
+            }
         }
         if (beams.isEmpty()) return;
 

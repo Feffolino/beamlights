@@ -8,7 +8,7 @@ import it.ratlab.beamlights.api.Beam;
 import it.ratlab.beamlights.api.BeamProvider;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.Luminance;
-import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.api.math.V3;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
