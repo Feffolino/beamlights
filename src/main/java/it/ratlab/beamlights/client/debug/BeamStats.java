@@ -1,7 +1,6 @@
 package it.ratlab.beamlights.client.debug;
 
 import it.ratlab.beamlights.client.LightBackend;
-import it.ratlab.beamlights.client.mask.GammaMask;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.LightPointPlanner;
@@ -102,7 +101,6 @@ public final class BeamStats {
                         movesPerSecond * SECTIONS_PER_CHANGE, avgMicros),
                 perfLine(),
                 motionLine(),
-                GammaMask.statusLine(),
                 "layout: " + layout,
                 "providers: " + BeamRegistry.INSTANCE.providerNames());
     }

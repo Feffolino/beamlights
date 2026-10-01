@@ -7,7 +7,6 @@ import com.mojang.brigadier.context.CommandContext;
 import it.ratlab.beamlights.BeamLights;
 import it.ratlab.beamlights.client.BeamClientTicker;
 import it.ratlab.beamlights.client.LightBackend;
-import it.ratlab.beamlights.client.mask.GammaMask;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.data.BeamDefinitions;
@@ -46,7 +45,6 @@ public final class BeamClientCommands {
                 .then(Commands.literal("off").executes(c -> saved(c, BeamClientConfig.ENABLED, false, "enabled")))
                 .then(Commands.literal("reload").executes(c -> {
                     BeamClientTicker.resetBackend();
-                    GammaMask.resetFailure();
                     reply(c, "Backend reset: " + BeamClientTicker.backend().name());
                     return 1;
                 }))
@@ -56,7 +54,6 @@ public final class BeamClientCommands {
                 .then(PerfCommands.build())
                 .then(MotionCommands.build())
                 .then(ConeCommands.build())
-                .then(MaskCommands.build())
                 .then(smoothing())
                 .then(Commands.literal("debug")
                         .then(toggle("overlay", DebugState::setOverlay))
@@ -183,7 +180,6 @@ public final class BeamClientCommands {
         reply(c, "Layout: " + BeamClientTicker.layoutLine() + " (/beamlights layout show)");
         reply(c, "Smoothing: " + smoothingLine() + " (/beamlights smoothing ...)");
         reply(c, "Performance: " + PerfCommands.settingsLine() + " (/beamlights perf ...)");
-        reply(c, "Gamma " + GammaMask.statusLine() + " (/beamlights mask ...)");
         reply(c, "Motion: " + MotionCommands.settingsLine() + " (/beamlights motion ...)");
         reply(c, "Server game rules: " + BeamGameRules.BLOCK_SPAWNS_NAME + ", " + BeamGameRules.ATTRACT_MOBS_NAME
                 + " (/beamlights spawns|attract [on|off])");

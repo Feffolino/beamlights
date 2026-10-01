@@ -6,7 +6,6 @@ import it.ratlab.beamlights.client.debug.BeamStats;
 import it.ratlab.beamlights.client.debug.DebugDump;
 import it.ratlab.beamlights.client.debug.DebugState;
 import it.ratlab.beamlights.client.debug.TracedBeam;
-import it.ratlab.beamlights.client.mask.GammaMask;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
@@ -87,7 +86,6 @@ public final class BeamClientTicker {
             lastLevel = null;
             STATS.reset();
             DebugState.setLastFrame(List.of());
-            GammaMask.publish(null, V3.ZERO, V3.ZERO);
             return;
         }
         if (level != lastLevel) {
@@ -262,10 +260,6 @@ public final class BeamClientTicker {
         boolean cones = b.wantsBeams();
         int coneOffset = BeamClientConfig.LDL_CONE_LUMINANCE_OFFSET.get();
         ConePolicy.Settings coneSettings = BeamClientConfig.coneSettings();
-        // Gamma mask: the local beam is drawn on screen; its physical light keeps only the central ray.
-        boolean maskWanted = GammaMask.wanted();
-        LightPointPlanner.Settings maskCentral = BeamClientConfig.MASK_MIDPOINTS.get() ? settings : settingsNoMid;
-        Beam maskBeam = null;
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -286,7 +280,6 @@ public final class BeamClientTicker {
         List<V3> shared = SHARED;
         for (Entity e : emitters) {
             boolean local = e == player;
-            boolean masked = local && maskWanted;
             boolean reduced = !local && e.distanceToSqr(player) > lodSq;
             EmitterCache cache = EMITTER_CACHE.computeIfAbsent(e.getId(), id -> new EmitterCache());
             cache.lastSeen = tick;
@@ -313,8 +306,7 @@ public final class BeamClientTicker {
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
             int entityUsed = 0;
             // Pass 0: central rays of every beam, so they win the per-entity budget; pass 1: side rays (not in LOD).
-            int passes = reduced || masked ? 1 : 2;
-            if (masked && beamCount > 0) maskBeam = beams.get(0);
+            int passes = reduced ? 1 : 2;
             for (int pass = 0; pass < passes; pass++) {
                 boolean side = pass == 1;
                 if (side && layout.isEmpty()) break;
@@ -334,13 +326,13 @@ public final class BeamClientTicker {
                                 : beam;
                         BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(),
                                 occlusion);
-                        if (cones && !side && !masked) {
+                        if (cones && !side) {
                             int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
                             cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT),
                                     ConePolicy.target(rayBeam.origin(), rayBeam.dir(), trace.hit(), trace.distance(),
                                             HIT_BACKOFF, beam.coneDeg(), coneLum, coneSettings)));
                         }
-                        LightPointPlanner.Settings s = !side ? (masked ? maskCentral : reduced ? settingsNoMid : settings)
+                        LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)
                                 : spec.midpoints() ? sideMid : settingsNoMid;
                         LightPointPlanner.Plan plan = LightPointPlanner.plan(rayBeam.origin(), rayBeam.dir(), trace,
                                 lum, s, occlusion, shared, side);
@@ -380,9 +372,6 @@ public final class BeamClientTicker {
             if (frame != null) frame.addAll(cache.frame);
         }
         EMITTER_CACHE.values().removeIf(c -> c.lastSeen != tick);
-        var look = player.getViewVector(1.0f);
-        GammaMask.publish(maskBeam, new V3(player.getX(), player.getEyeY(), player.getZ()),
-                new V3(look.x, look.y, look.z));
 
         // Global cap on the smoothed output; ghosts come last, so they are the first to go.
         List<LightSmoother.Output> out = SMOOTHER.update(targets, new LightSmoother.Settings(
