@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0 (unreleased)
+Gamma mask: the local player's beam is drawn as a screen-space post pass instead of a cone of physical lights.
+- After the level (before the hand) colour and depth are copied; a fullscreen shader rebuilds each pixel's position
+  from depth and brightens the beam cone with a gamma lift (`colour^(1/(1+maskGamma*m))` + small `maskLift`). In
+  first person the camera is at the flashlight, so the visible surface is the lit one. Sky is untouched.
+- No chunk rebuilds for the cone: while the mask is active the local player keeps only the central ray as physical
+  light (no side rays, no LDL cone, midpoints only with `maskMidpoints`). Other emitters are unchanged.
+- Visual only: the block light level inside the cone does not change (spawn blocking is server-side, unaffected).
+- Off automatically, with the 1.1.0 behaviour, when an Iris shader pack is in use, in third person, or if the pass
+  fails (`/beamlights reload` retries).
+- Follows the camera every frame while the beam points where the player looks; strength follows luminance/15 (Omega
+  flicker) with a `maskFadeSeconds` fade.
+- New `[mask]` config section; `/beamlights mask [show|<key> [value]]`; overlay and status show the mask state.
+
 ## 1.1.0 (unreleased)
 Cone light performance (LDL `ldlConeLight`). Measured outdoors in a Lost Cities city (LambDynamicLights 4.8.11,
 CENTER_ONLY): 50 FPS with the cone vs 100 without; LDL went from 2.1 % to 10.4 % of the render thread (per

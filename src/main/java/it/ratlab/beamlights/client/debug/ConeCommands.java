@@ -101,7 +101,7 @@ final class ConeCommands {
         BeamClientConfig.CONE_FREEZE_WHEN_FAST.set(s.freezeWhenFast());
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> doubleKey(String name, String key,
+    static LiteralArgumentBuilder<CommandSourceStack> doubleKey(String name, String key,
                                                                         ModConfigSpec.DoubleValue v, double min,
                                                                         double max) {
         return Commands.literal(name)
@@ -118,7 +118,7 @@ final class ConeCommands {
                         .executes(c -> saved(c, v, IntegerArgumentType.getInteger(c, "value"), key)));
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> boolKey(String name, String key,
+    static LiteralArgumentBuilder<CommandSourceStack> boolKey(String name, String key,
                                                                       ModConfigSpec.BooleanValue v) {
         return Commands.literal(name)
                 .executes(c -> BeamClientCommands.current(c, key, v.get()))

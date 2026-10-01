@@ -270,6 +270,52 @@ public final class BeamClientConfig {
         B.pop();
     }
 
+    // Gamma mask: screen-space beam for the local player (vanilla rendering only).
+    static {
+        B.comment("Gamma mask: the local player's beam is drawn as a screen-space brightening of the cone (depth",
+                "buffer, no chunk rebuilds). Visual only; the physical light keeps just the central hit point. Off",
+                "automatically with an Iris shader pack, in third person or if the pass fails. Keys: /beamlights mask ...")
+                .push("mask");
+    }
+
+    public static final ModConfigSpec.BooleanValue GAMMA_MASK = B
+            .comment("Draw the local player's beam with the gamma mask.")
+            .define("gammaMask", true);
+    public static final ModConfigSpec.DoubleValue MASK_STRENGTH = B
+            .comment("Mask strength at full beam luminance (scaled by luminance/15).")
+            .defineInRange("maskStrength", 1.0, 0.0, 3.0);
+    public static final ModConfigSpec.DoubleValue MASK_GAMMA = B
+            .comment("Gamma lift: colour^(1/(1+maskGamma*mask)). Higher = dark surfaces brighter.")
+            .defineInRange("maskGamma", 2.5, 0.0, 8.0);
+    public static final ModConfigSpec.DoubleValue MASK_LIFT = B
+            .comment("Additive lift so pure black is lit too.")
+            .defineInRange("maskLift", 0.04, 0.0, 0.3);
+    public static final ModConfigSpec.DoubleValue MASK_ANGLE_SCALE = B
+            .comment("Mask half-angle relative to the beam's cone half-angle.")
+            .defineInRange("maskAngleScale", 1.0, 0.2, 3.0);
+    public static final ModConfigSpec.DoubleValue MASK_SOFTNESS = B
+            .comment("Soft edge: fraction of the half-angle that fades out (0 = hard edge).")
+            .defineInRange("maskSoftness", 0.35, 0.0, 1.0);
+    public static final ModConfigSpec.DoubleValue MASK_RANGE_SCALE = B
+            .comment("Mask reach relative to the beam range.")
+            .defineInRange("maskRangeScale", 1.0, 0.1, 2.0);
+    public static final ModConfigSpec.DoubleValue MASK_FALLOFF = B
+            .comment("Distance falloff exponent of (1 - dist/range); 0 = flat.")
+            .defineInRange("maskFalloff", 0.7, 0.0, 4.0);
+    public static final ModConfigSpec.DoubleValue MASK_TINT = B
+            .comment("How much the beam colour tints the additive lift (0 = white).")
+            .defineInRange("maskTint", 0.25, 0.0, 1.0);
+    public static final ModConfigSpec.DoubleValue MASK_FADE_SECONDS = B
+            .comment("Seconds to fade the mask fully in or out (toggle, flicker).")
+            .defineInRange("maskFadeSeconds", 0.15, 0.0, 2.0);
+    public static final ModConfigSpec.BooleanValue MASK_MIDPOINTS = B
+            .comment("While the mask is active, keep midpoints of the central ray as physical lights.")
+            .define("maskMidpoints", false);
+
+    static {
+        B.pop();
+    }
+
     public static final ModConfigSpec SPEC = B.build();
 
     private BeamClientConfig() {

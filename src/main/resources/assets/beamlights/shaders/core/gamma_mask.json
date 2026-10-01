@@ -1,0 +1,21 @@
+{
+    "vertex": "beamlights:gamma_mask",
+    "fragment": "beamlights:gamma_mask",
+    "samplers": [
+        { "name": "ColorSampler" },
+        { "name": "DepthSampler" }
+    ],
+    "uniforms": [
+        { "name": "InvViewProj", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "BeamOrigin", "type": "float", "count": 3, "values": [ 0.0, 0.0, 0.0 ] },
+        { "name": "BeamDir", "type": "float", "count": 3, "values": [ 0.0, 0.0, 1.0 ] },
+        { "name": "CosOuter", "type": "float", "count": 1, "values": [ 0.9 ] },
+        { "name": "CosInner", "type": "float", "count": 1, "values": [ 0.95 ] },
+        { "name": "Range", "type": "float", "count": 1, "values": [ 16.0 ] },
+        { "name": "Falloff", "type": "float", "count": 1, "values": [ 0.7 ] },
+        { "name": "Strength", "type": "float", "count": 1, "values": [ 0.0 ] },
+        { "name": "Gamma", "type": "float", "count": 1, "values": [ 2.5 ] },
+        { "name": "Lift", "type": "float", "count": 1, "values": [ 0.04 ] },
+        { "name": "Tint", "type": "float", "count": 3, "values": [ 1.0, 1.0, 1.0 ] }
+    ]
+}
