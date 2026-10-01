@@ -1,0 +1,11 @@
+{
+  "items": ["minecraft:leather_helmet"],
+  "slots": ["head", "curios"],
+  "luminance": 14,
+  "range": 24,
+  "cone": 20,
+  "color": "#E8F0FF",
+  "condition": { "component": "minecraft:custom_name", "present": true },
+  "origin": { "forward": 0.2, "down": -0.1 },
+  "priority": 1
+}

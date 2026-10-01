@@ -23,8 +23,8 @@ public final class DebugDump {
                 backend.statusLine(), backend.ownCount(), backend.totalCount(), beams.size());
         int accepted = 0;
         for (TracedBeam tb : beams) {
-            BeamLights.LOG.info("[beamlights dump]  owner={} ray={} side={} origin={} dir={} range={} cone={} lum={} hit={} dist={}",
-                    tb.owner(), tb.ray(), tb.side(), fmt(tb.beam().origin()), fmt(tb.beam().dir().normalize()),
+            BeamLights.LOG.info("[beamlights dump]  owner={} source={} ray={} side={} origin={} dir={} range={} cone={} lum={} hit={} dist={}",
+                    tb.owner(), tb.source(), tb.ray(), tb.side(), fmt(tb.beam().origin()), fmt(tb.beam().dir().normalize()),
                     tb.beam().range(), tb.beam().coneDeg(), tb.beam().luminance(), tb.trace().hit(),
                     String.format(Locale.ROOT, "%.2f", tb.trace().distance()));
             for (PlannedPoint p : tb.plan().points()) {

@@ -1,0 +1,9 @@
+{
+  "items": ["minecraft:lantern", "minecraft:soul_lantern"],
+  "slots": ["mainhand", "offhand"],
+  "luminance": 12,
+  "range": 12,
+  "cone": 40,
+  "color": "#FFD08A",
+  "origin": { "forward": 0.3, "down": 0.3 }
+}

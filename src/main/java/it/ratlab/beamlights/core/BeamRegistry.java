@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /** Ordered provider list. A failing provider is logged once and skipped for that entity. */
@@ -45,6 +46,17 @@ public final class BeamRegistry {
         for (BeamProvider p : providers) {
             try {
                 if (p.mayEmit(entity)) p.collect(entity, partialTick, out);
+            } catch (RuntimeException | LinkageError e) {
+                warnOnce(p, e);
+            }
+        }
+    }
+
+    /** Like collect, with the provider name of each beam (debug output). */
+    public void collectNamed(Entity entity, float partialTick, BiConsumer<String, Beam> out) {
+        for (BeamProvider p : providers) {
+            try {
+                if (p.mayEmit(entity)) p.collect(entity, partialTick, b -> out.accept(p.name(), b));
             } catch (RuntimeException | LinkageError e) {
                 warnOnce(p, e);
             }

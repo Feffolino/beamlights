@@ -9,6 +9,7 @@ import it.ratlab.beamlights.client.BeamClientTicker;
 import it.ratlab.beamlights.client.LightBackend;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
+import it.ratlab.beamlights.data.BeamDefinitions;
 import it.ratlab.beamlights.server.BeamGameRules;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -140,6 +141,8 @@ public final class BeamClientCommands {
                 + " (/beamlights spawns|attract [on|off])");
         reply(c, "Providers: " + BeamRegistry.INSTANCE.providerNames()
                 + ", Omega Flashlight loaded: " + ModList.get().isLoaded("omegaflashlight"));
+        reply(c, "Data beam definitions: " + BeamDefinitions.CLIENT.size() + " (synced from the server"
+                + (BeamDefinitions.CLIENT.usesCurios() ? ", Curios slots used" : "") + ")");
         return 1;
     }
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+- Data-driven beams: datapack files `data/<ns>/beamlights/beams/*.json` (items or item tags, slots
+  mainhand/offhand/head/curios, luminance, range, cone, colour, optional data component condition `present`/`equals`,
+  origin offset, priority). Loaded by a server reload listener, invalid files logged and skipped; synced to clients
+  with an optional payload (`beamlights:beam_definitions`) on join and `/reload`, client copy cleared on logout.
+- New provider `data` (`core/DataBeamProvider`, both sides): players use hands, head and Curios, other living entities
+  hands and head; at most two beams per entity; Omega Flashlight items skipped (native provider).
+- Optional Curios support (`compat/curios`), public `api/BeamLightsApi.register(BeamProvider)`, KubeJS binding
+  `BeamLights.isBeamActive(entity)` / `beamCount(entity)`.
+- `/beamlights status` shows the number of synced data definitions; `/beamlights debug dump` prints the provider of
+  each ray. Examples in `examples/datapack` (not shipped in the jar).
+
 ## 0.6.0 (unreleased)
 - Smooth light movement (`core/LightSmoother`, between ticker and backend): small moves glide
   (`smoothFactor`, default 0.5), jumps of at least `jumpDistance` (default 3) blocks crossfade (a ghost fades out at the

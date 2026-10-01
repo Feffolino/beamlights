@@ -18,6 +18,7 @@ import it.ratlab.beamlights.core.LightSmoother;
 import it.ratlab.beamlights.core.RayLayout;
 import it.ratlab.beamlights.core.RaySpec;
 import it.ratlab.beamlights.core.math.V3;
+import it.ratlab.beamlights.data.BeamDefinitions;
 import it.ratlab.beamlights.world.LevelOcclusion;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -103,6 +104,7 @@ public final class BeamClientTicker {
     static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         safeClear();
         lastLevel = null;
+        BeamDefinitions.CLIENT.clear();
     }
 
     private static void safeClear() {
@@ -200,11 +202,16 @@ public final class BeamClientTicker {
 
         List<LightSmoother.Target> targets = new ArrayList<>();
         List<Beam> beams = new ArrayList<>();
+        List<String> sources = new ArrayList<>();
         List<V3> shared = new ArrayList<>();
         for (Entity e : emitters) {
             beams.clear();
+            sources.clear();
             shared.clear();
-            BeamRegistry.INSTANCE.collect(e, 1.0f, beams::add);
+            BeamRegistry.INSTANCE.collectNamed(e, 1.0f, (src, beam) -> {
+                sources.add(src);
+                beams.add(beam);
+            });
             // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
             int entityUsed = 0;
@@ -242,7 +249,7 @@ public final class BeamClientTicker {
                             entityUsed++;
                         }
                         if (frame != null) {
-                            frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), e.getId(), ray, side,
+                            frame.add(new TracedBeam(e.getName().getString() + "#" + e.getId(), sources.get(bi), e.getId(), ray, side,
                                     rayBeam, trace, plan));
                         }
                     }

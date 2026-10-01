@@ -41,13 +41,23 @@ neoForge {
     }
 }
 
+repositories {
+    maven { name = "LatvianModder (KubeJS, Rhino)"; url = "https://maven.latvian.dev/releases"
+            content { includeGroup "dev.latvian.mods" } }
+}
+
 dependencies {
     // Optional integrations, compile-only (never bundled, never on the dev-run classpath). Jars copied from the pack into
     // libs/ (gitignored). Code touching them is only class-loaded after a ModList check.
     compileOnly files('libs/sodiumdynamiclights-neoforge-1.0.10-1.21.1.jar')
     compileOnly files('libs/omegaflashlight-1.6.6-1.21.1.jar')
+    compileOnly files('libs/curios-neoforge-9.5.1+1.21.1.jar')
+    compileOnly("dev.latvian.mods:kubejs-neoforge:2101.7.2-build.377") { transitive = false }
+    compileOnly("dev.latvian.mods:rhino:2101.2.7-build.85") { transitive = false }
 
     // Unit tests cover the pure core package (no Minecraft classes).
+    // Gson (shipped with Minecraft) for BeamDefinition parsing tests.
+    testImplementation 'com.google.code.gson:gson:2.10.1'
     testImplementation platform('org.junit:junit-bom:5.10.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -73,6 +83,8 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_version                  : mod_version,
             sdl_version_range            : sdl_version_range,
             omegaflashlight_version_range: omegaflashlight_version_range,
+            curios_version_range         : curios_version_range,
+            kubejs_version_range         : kubejs_version_range,
     ]
     inputs.properties replaceProperties
     expand replaceProperties

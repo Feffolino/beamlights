@@ -4,6 +4,8 @@ import com.mojang.logging.LogUtils;
 import it.ratlab.beamlights.compat.omega.OmegaCompat;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.config.BeamServerConfig;
+import it.ratlab.beamlights.core.BeamRegistry;
+import it.ratlab.beamlights.core.DataBeamProvider;
 import it.ratlab.beamlights.server.BeamGameRules;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -29,6 +31,7 @@ public final class BeamLights {
         event.enqueueWork(() -> {
             BeamGameRules.register();
             if (ModList.get().isLoaded("omegaflashlight")) OmegaCompat.register();
+            BeamRegistry.INSTANCE.register(new DataBeamProvider());
         });
     }
 }
