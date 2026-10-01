@@ -1,10 +1,15 @@
 # Changelog
 
-## 1.1.1 (unreleased)
+## 1.1.2 (unreleased)
 - `openAreaPattern` ([cone], default CENTER_ONLY): with `ldlConeLight` on, beams that get no cone (open area: hit
   farther than `coneMaxDistanceForCone`, or no hit) use this side ray pattern instead of `rayPattern`, e.g.
   `rayPattern = CENTER_ONLY` + `openAreaPattern = RING` = cone indoors, ring outdoors.
   `/beamlights cone openArea <pattern>`.
+- Open area gate per beam: hysteresis band `openAreaHysteresis` (2 blocks) around `coneMaxDistanceForCone`, each state
+  held `openAreaMinTicks` (10); the lit point under the open sky (`openAreaSky`, sky light >= `openAreaSkyLight` 15)
+  also counts as open. After switching to open the side rays start 4 levels dimmer for `openAreaFadeTicks` (6).
+- Overlay line `area:` shows CONE / OPEN, how long, hit distance, sky light and the thresholds.
+- `/beamlights cone openHysteresis|openMinTicks|openSky|openSkyLight|openFade [value]`.
 
 ## 1.1.0 (unreleased)
 Cone light performance (LDL `ldlConeLight`). Measured outdoors in a Lost Cities city (LambDynamicLights 4.8.11,

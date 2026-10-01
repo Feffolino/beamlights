@@ -24,6 +24,8 @@ public final class BeamStats {
     private int movesTick, deferredTick;
     /** Set by the ticker when the ray layout is rebuilt. */
     public String layout = "-";
+    /** Local player's open area state (cone / open), set by the ticker. */
+    public String area = "-";
     private double avgMicros;
     private int movesWindow;
     private long windowStart;
@@ -101,6 +103,7 @@ public final class BeamStats {
                         movesPerSecond * SECTIONS_PER_CHANGE, avgMicros),
                 perfLine(),
                 motionLine(),
+                "area: " + area,
                 "layout: " + layout,
                 "providers: " + BeamRegistry.INSTANCE.providerNames());
     }

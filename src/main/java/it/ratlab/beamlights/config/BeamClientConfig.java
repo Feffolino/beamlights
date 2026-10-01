@@ -3,6 +3,7 @@ package it.ratlab.beamlights.config;
 import it.ratlab.beamlights.core.ConeLight;
 import it.ratlab.beamlights.core.ConePolicy;
 import it.ratlab.beamlights.core.MotionGovernor;
+import it.ratlab.beamlights.core.OpenAreaGate;
 import it.ratlab.beamlights.core.RayLayout;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -251,6 +252,22 @@ public final class BeamClientConfig {
                     "(open area: hit farther than coneMaxDistanceForCone, or no hit). Same values as rayPattern;",
                     "CENTER_ONLY = just the hit point. The other layout keys (sideRays, coneSpread, ...) apply.")
             .defineEnum("openAreaPattern", RayLayout.Pattern.CENTER_ONLY);
+    public static final ModConfigSpec.DoubleValue OPEN_AREA_HYSTERESIS = B
+            .comment("Band (blocks) around coneMaxDistanceForCone: the beam turns open beyond max + this and back to",
+                    "cone below max - this, so a hit point near the limit does not flip every tick.")
+            .defineInRange("openAreaHysteresis", 2.0, 0.0, 16.0);
+    public static final ModConfigSpec.IntValue OPEN_AREA_MIN_TICKS = B
+            .comment("Each state (cone / open) is held at least this many ticks after a switch.")
+            .defineInRange("openAreaMinTicks", 10, 0, 100);
+    public static final ModConfigSpec.BooleanValue OPEN_AREA_SKY = B
+            .comment("Also open when the lit point is under the open sky (sky light >= openAreaSkyLight), even if near.")
+            .define("openAreaSky", true);
+    public static final ModConfigSpec.IntValue OPEN_AREA_SKY_LIGHT = B
+            .comment("Sky light level at the lit point that counts as open sky (15 = directly under the sky).")
+            .defineInRange("openAreaSkyLight", 15, 1, 15);
+    public static final ModConfigSpec.IntValue OPEN_AREA_FADE_TICKS = B
+            .comment("After switching to open, side rays start 4 levels dimmer for this many ticks (0 = no fade).")
+            .defineInRange("openAreaFadeTicks", 6, 0, 40);
     public static final ModConfigSpec.DoubleValue CONE_END_FACTOR = B
             .comment("Cone level at the end relative to the apex.")
             .defineInRange("coneEndFactor", 0.5, 0.1, 1.0);
@@ -289,6 +306,11 @@ public final class BeamClientConfig {
         return new ConePolicy.Settings(CONE_MAX_ANGLE.get(), CONE_MAX_LENGTH.get(), CONE_MIN_LENGTH.get(),
                 CONE_MAX_DISTANCE.get(), CONE_LENGTH_HYSTERESIS.get(), CONE_APEX_HYSTERESIS.get(),
                 CONE_ANGLE_HYSTERESIS.get(), CONE_FREEZE_WHEN_FAST.get());
+    }
+
+    public static OpenAreaGate.Settings openAreaSettings() {
+        return new OpenAreaGate.Settings(CONE_MAX_DISTANCE.get(), OPEN_AREA_HYSTERESIS.get(), OPEN_AREA_MIN_TICKS.get(),
+                OPEN_AREA_SKY.get(), OPEN_AREA_SKY_LIGHT.get());
     }
 
     public static ConeLight.Look coneLook() {

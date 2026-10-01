@@ -19,6 +19,7 @@ import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.LightSmoother;
 import it.ratlab.beamlights.core.MotionGovernor;
+import it.ratlab.beamlights.core.OpenAreaGate;
 import it.ratlab.beamlights.core.RayLayout;
 import it.ratlab.beamlights.core.RaySpec;
 import it.ratlab.beamlights.core.SourceMotion;
@@ -51,6 +52,15 @@ public final class BeamClientTicker {
     private static final double HIT_BACKOFF = 0.5;
     private static final int RAYS_PER_BEAM = Keys.RAYS_PER_BEAM;
     private static final int MAX_BEAMS_PER_ENTITY = 256 / RAYS_PER_BEAM;
+    /** Levels the open area side rays start dimmer right after switching (OpenAreaGate.fadeOffset). */
+    private static final int OPEN_FADE_DIM = 4;
+
+    /** Sky light just in front of the lit face. */
+    private static int skyLightAt(ClientLevel level, V3 point, V3 dir) {
+        V3 p = point.sub(dir.normalize().scale(HIT_BACKOFF));
+        return level.getBrightness(net.minecraft.world.level.LightLayer.SKY,
+                net.minecraft.core.BlockPos.containing(p.x(), p.y(), p.z()));
+    }
 
     private static LayoutKey layoutKey;
     private static List<RaySpec> cachedLayout = List.of();
@@ -206,6 +216,8 @@ public final class BeamClientTicker {
         /** Cones shown per key (ConePolicy hysteresis and FAST freeze). */
         final Map<Long, ConeLight.Shape> heldCones = new HashMap<>();
         final MotionGovernor motion = new MotionGovernor();
+        /** Open area state per beam (index = beam), created on first use. */
+        final OpenAreaGate[] gates = new OpenAreaGate[MAX_BEAMS_PER_ENTITY];
         long lastSeen;
         long lastTraced;
         boolean traced;
@@ -280,6 +292,13 @@ public final class BeamClientTicker {
         boolean cones = b.wantsBeams();
         int coneOffset = BeamClientConfig.LDL_CONE_LUMINANCE_OFFSET.get();
         ConePolicy.Settings coneSettings = BeamClientConfig.coneSettings();
+        // The open area gate decides "too far / open sky"; the cone policy then only applies its other rules.
+        ConePolicy.Settings coneNoDistance = new ConePolicy.Settings(coneSettings.maxAngleDeg(), coneSettings.maxLength(),
+                coneSettings.minLength(), Double.POSITIVE_INFINITY, coneSettings.lengthHysteresis(),
+                coneSettings.apexHysteresis(), coneSettings.angleHysteresisDeg(), coneSettings.freezeWhenFast());
+        OpenAreaGate.Settings openSettings = BeamClientConfig.openAreaSettings();
+        int openFadeTicks = BeamClientConfig.OPEN_AREA_FADE_TICKS.get();
+        if (!cones) STATS.area = "cone light off";
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -325,21 +344,25 @@ public final class BeamClientTicker {
             // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
             int entityUsed = 0;
-            // Beams whose central ray got a cone (bit per beam); the others use the open area layout.
-            long coned = 0;
+            // Beams in an open area (bit per beam): no cone, openAreaPattern side rays.
+            long openBits = 0;
+            int sinceTrace = cache.lastTraced == 0 ? 1 : (int) Math.min(100, tick - cache.lastTraced);
             // Pass 0: central rays of every beam, so they win the per-entity budget; pass 1: side rays (not in LOD).
             int passes = reduced ? 1 : 2;
             for (int pass = 0; pass < passes; pass++) {
                 boolean side = pass == 1;
                 for (int bi = 0; bi < beamCount; bi++) {
                     Beam beam = beams.get(bi);
-                    List<RaySpec> beamLayout = cones && (coned & (1L << bi)) == 0 ? open : layout;
+                    boolean useOpen = cones && (openBits & (1L << bi)) != 0;
+                    List<RaySpec> beamLayout = useOpen ? open : layout;
+                    int fade = useOpen && side
+                            ? OpenAreaGate.fadeOffset(cache.gates[bi].held(), openFadeTicks, OPEN_FADE_DIM) : 0;
                     if (side && beamLayout.isEmpty()) continue;
                     List<V3> dirs = side ? ConeRays.directions(beam.dir(), beam.coneDeg(), beamLayout) : null;
                     int rays = side ? dirs.size() : 1;
                     for (int i = 0; i < rays; i++) {
                         RaySpec spec = side ? beamLayout.get(i) : null;
-                        int lum = side ? Math.max(0, Math.min(15, beam.luminance() + spec.luminanceOffset()))
+                        int lum = side ? Math.max(0, Math.min(15, beam.luminance() + spec.luminanceOffset() + fade))
                                 : beam.luminance();
                         if (lum <= 0) continue;
                         int ray = bi * RAYS_PER_BEAM + (side ? i + 1 : 0);
@@ -351,9 +374,24 @@ public final class BeamClientTicker {
                                 occlusion);
                         if (cones && !side) {
                             int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
-                            ConeLight.Shape shape = ConePolicy.target(rayBeam.origin(), rayBeam.dir(), trace.hit(),
-                                    trace.distance(), HIT_BACKOFF, beam.coneDeg(), coneLum, coneSettings);
-                            if (shape != null) coned |= 1L << bi;
+                            OpenAreaGate gate = cache.gates[bi];
+                            if (gate == null) gate = cache.gates[bi] = new OpenAreaGate();
+                            int sky = trace.hit() ? skyLightAt(level, trace.point(), rayBeam.dir()) : 15;
+                            boolean isOpen = gate.update(trace.hit(), trace.distance(), sky, sinceTrace, openSettings);
+                            if (isOpen) openBits |= 1L << bi;
+                            if (local && bi == 0) {
+                                STATS.area = String.format(java.util.Locale.ROOT,
+                                        "%s for %d t (hit %s, sky %d, cone below %.0f / open above %.0f%s)",
+                                        isOpen ? "OPEN -> " + BeamClientConfig.OPEN_AREA_PATTERN.get() : "CONE",
+                                        gate.held(), trace.hit() ? String.format(java.util.Locale.ROOT, "%.1f",
+                                                trace.distance()) : "none", sky,
+                                        openSettings.maxDistance() - openSettings.hysteresis(),
+                                        openSettings.maxDistance() + openSettings.hysteresis(),
+                                        openSettings.skyOpen() ? ", sky >= " + openSettings.skyLight() : "");
+                            }
+                            ConeLight.Shape shape = isOpen ? null : ConePolicy.target(rayBeam.origin(), rayBeam.dir(),
+                                    trace.hit(), trace.distance(), HIT_BACKOFF, beam.coneDeg(), coneLum,
+                                    coneNoDistance);
                             cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT), shape));
                         }
                         LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)

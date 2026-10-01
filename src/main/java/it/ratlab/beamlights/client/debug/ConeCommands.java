@@ -53,6 +53,11 @@ final class ConeCommands {
                                 .suggests((c, b) -> SharedSuggestionProvider.suggest(
                                         java.util.Arrays.stream(RayLayout.Pattern.values()).map(Enum::name), b))
                                 .executes(ConeCommands::openArea)))
+                .then(doubleKey("openHysteresis", "openAreaHysteresis", BeamClientConfig.OPEN_AREA_HYSTERESIS, 0, 16))
+                .then(intKey("openMinTicks", "openAreaMinTicks", BeamClientConfig.OPEN_AREA_MIN_TICKS, 0, 100))
+                .then(boolKey("openSky", "openAreaSky", BeamClientConfig.OPEN_AREA_SKY))
+                .then(intKey("openSkyLight", "openAreaSkyLight", BeamClientConfig.OPEN_AREA_SKY_LIGHT, 1, 15))
+                .then(intKey("openFade", "openAreaFadeTicks", BeamClientConfig.OPEN_AREA_FADE_TICKS, 0, 40))
                 .then(Commands.literal("preset")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .suggests((c, b) -> SharedSuggestionProvider.suggest(PRESETS, b))
@@ -73,7 +78,11 @@ final class ConeCommands {
 
     static String settingsLine() {
         return "ldlConeLight " + BeamClientConfig.LDL_CONE_LIGHT.get() + ", openAreaPattern "
-                + BeamClientConfig.OPEN_AREA_PATTERN.get() + ", ldlConeLuminanceOffset "
+                + BeamClientConfig.OPEN_AREA_PATTERN.get() + ", openAreaHysteresis "
+                + BeamClientConfig.OPEN_AREA_HYSTERESIS.get() + ", openAreaMinTicks "
+                + BeamClientConfig.OPEN_AREA_MIN_TICKS.get() + ", openAreaSky " + BeamClientConfig.OPEN_AREA_SKY.get()
+                + ", openAreaSkyLight " + BeamClientConfig.OPEN_AREA_SKY_LIGHT.get() + ", openAreaFadeTicks "
+                + BeamClientConfig.OPEN_AREA_FADE_TICKS.get() + ", ldlConeLuminanceOffset "
                 + BeamClientConfig.LDL_CONE_LUMINANCE_OFFSET.get() + ", coneMaxAngle "
                 + BeamClientConfig.CONE_MAX_ANGLE.get() + ", coneMaxLength " + BeamClientConfig.CONE_MAX_LENGTH.get()
                 + ", coneMinLength " + BeamClientConfig.CONE_MIN_LENGTH.get() + ", coneMaxDistanceForCone "
