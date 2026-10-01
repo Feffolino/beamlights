@@ -21,14 +21,8 @@ final class MaskCommands {
                 .then(Commands.literal("show").executes(MaskCommands::show))
                 .then(ConeCommands.boolKey("enabled", "gammaMask", BeamClientConfig.GAMMA_MASK))
                 .then(ConeCommands.doubleKey("strength", "maskStrength", BeamClientConfig.MASK_STRENGTH, 0, 3))
-                .then(ConeCommands.doubleKey("gain", "maskGain", BeamClientConfig.MASK_GAIN, 0, 20))
-                .then(ConeCommands.doubleKey("shading", "maskShading", BeamClientConfig.MASK_SHADING, 0, 1))
-                .then(ConeCommands.doubleKey("knee", "maskKnee", BeamClientConfig.MASK_KNEE, 0.3, 1))
-                .then(ConeCommands.doubleKey("brightCutoff", "maskBrightCutoff", BeamClientConfig.MASK_BRIGHT_CUTOFF,
-                        0.1, 1))
-                .then(ConeCommands.doubleKey("ambientFade", "maskAmbientFade", BeamClientConfig.MASK_AMBIENT_FADE,
-                        0, 1))
-                .then(ConeCommands.doubleKey("blackLift", "maskBlackLift", BeamClientConfig.MASK_BLACK_LIFT, 0, 0.2))
+                .then(ConeCommands.doubleKey("gamma", "maskGamma", BeamClientConfig.MASK_GAMMA, 0, 8))
+                .then(ConeCommands.doubleKey("lift", "maskLift", BeamClientConfig.MASK_LIFT, 0, 0.3))
                 .then(ConeCommands.doubleKey("angle", "maskAngleScale", BeamClientConfig.MASK_ANGLE_SCALE, 0.2, 3))
                 .then(ConeCommands.doubleKey("softness", "maskSoftness", BeamClientConfig.MASK_SOFTNESS, 0, 1))
                 .then(ConeCommands.doubleKey("range", "maskRangeScale", BeamClientConfig.MASK_RANGE_SCALE, 0.1, 2))
@@ -40,11 +34,8 @@ final class MaskCommands {
 
     static String settingsLine() {
         return "gammaMask " + BeamClientConfig.GAMMA_MASK.get() + ", maskStrength "
-                + BeamClientConfig.MASK_STRENGTH.get() + ", maskGain " + BeamClientConfig.MASK_GAIN.get()
-                + ", maskShading " + BeamClientConfig.MASK_SHADING.get() + ", maskKnee " + BeamClientConfig.MASK_KNEE.get()
-                + ", maskBrightCutoff " + BeamClientConfig.MASK_BRIGHT_CUTOFF.get() + ", maskAmbientFade "
-                + BeamClientConfig.MASK_AMBIENT_FADE.get() + ", maskBlackLift " + BeamClientConfig.MASK_BLACK_LIFT.get()
-                + ", maskAngleScale "
+                + BeamClientConfig.MASK_STRENGTH.get() + ", maskGamma " + BeamClientConfig.MASK_GAMMA.get()
+                + ", maskLift " + BeamClientConfig.MASK_LIFT.get() + ", maskAngleScale "
                 + BeamClientConfig.MASK_ANGLE_SCALE.get() + ", maskSoftness " + BeamClientConfig.MASK_SOFTNESS.get()
                 + ", maskRangeScale " + BeamClientConfig.MASK_RANGE_SCALE.get() + ", maskFalloff "
                 + BeamClientConfig.MASK_FALLOFF.get() + ", maskTint " + BeamClientConfig.MASK_TINT.get()

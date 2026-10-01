@@ -40,21 +40,11 @@ class MaskMathTest {
     }
 
     @Test
-    void lightMultipliesDarkKeepsContrastAndBright() {
-        assertEquals(0.05, MaskMath.light(0.05, 0.05, 0, 5, 0.65, 0.7, 0.015), EPS);
-        double a = MaskMath.light(0.04, 0.04, 1, 5, 0.65, 0.7, 0);
-        double b = MaskMath.light(0.08, 0.08, 1, 5, 0.65, 0.7, 0);
-        assertEquals(0.24, a, 1e-6);
-        assertEquals(2 * a, b, 1e-6); // contrast kept below the knee
-        assertEquals(0.9, MaskMath.light(0.9, 0.9, 1, 5, 0.65, 0.7, 0), EPS); // bright pixel untouched
-        assertTrue(MaskMath.light(0.5, 0.1, 1, 5, 0.65, 0.7, 0) < 1); // soft clip, never white
-    }
-
-    @Test
-    void softClipContinuous() {
-        assertEquals(0.7, MaskMath.softClip(0.7, 0.7), EPS);
-        assertTrue(MaskMath.softClip(5, 0.7) < 1);
-        assertTrue(MaskMath.softClip(0.71, 0.7) > 0.7);
+    void liftBrightensDarkKeepsBright() {
+        assertEquals(0.05, MaskMath.lift(0.05, 0, 2.5, 0.04, 1), EPS);
+        assertTrue(MaskMath.lift(0.05, 1, 2.5, 0.04, 1) > 0.3);
+        assertTrue(MaskMath.lift(0, 1, 2.5, 0.04, 1) > 0);
+        assertEquals(1, MaskMath.lift(1, 1, 2.5, 0.04, 1), EPS);
     }
 
     @Test

@@ -1,7 +1,7 @@
 package it.ratlab.beamlights.core;
 
 /**
- * Math of the gamma mask; the fragment shader assets/beamlights/shaders/core/gamma_mask.fsh mirrors mask(), light() and softClip().
+ * Math of the gamma mask; the fragment shader assets/beamlights/shaders/core/gamma_mask.fsh mirrors mask() and lift().
  * Pure, no Minecraft classes.
  */
 public final class MaskMath {
@@ -42,23 +42,10 @@ public final class MaskMath {
         return cone * d;
     }
 
-    /**
-     * One channel: multiplicative light (scene colour ~ albedo * ambient, so colour * (1 + gain * m) adds light and keeps
-     * texture contrast), faded out for already bright pixels (luma up to brightCutoff), then a soft knee.
-     */
-    public static double light(double c, double luma, double m, double gain, double brightCutoff, double knee,
-                               double blackLift) {
-        double g = gain * m * (1 - smoothstep(brightCutoff * 0.3, brightCutoff, luma));
-        double base = Math.max(0, c);
-        // Light only adds: the knee never darkens pixels that were already bright.
-        return Math.max(base, softClip(base * (1 + g) + blackLift * m, knee));
-    }
-
-    /** Identity up to knee, then an exponential shoulder approaching 1. */
-    public static double softClip(double x, double knee) {
-        if (x <= knee) return x;
-        double r = 1 - knee;
-        return knee + r * (1 - Math.exp(-(x - knee) / r));
+    /** One channel: gamma lift then a small additive lift so black is lit too. */
+    public static double lift(double c, double m, double gamma, double lift, double tint) {
+        double out = Math.pow(Math.max(0, c), 1 / (1 + gamma * m)) + lift * m * tint;
+        return Math.min(1, out);
     }
 
     /** Moves current toward target by at most dt/seconds (seconds <= 0 = jump). */

@@ -14,8 +14,6 @@ import it.ratlab.beamlights.api.math.V3;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.MaskMath;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
@@ -30,7 +28,7 @@ import java.io.IOException;
 
 /**
  * Draws the gamma mask after the level (before the hand): copies colour and depth of the main target, then a fullscreen
- * pass adds light inside the beam cone. Render thread only. Any failure disables the mask (GammaMask.fail) and the ticker
+ * pass brightens the beam cone. Render thread only. Any failure disables the mask (GammaMask.fail) and the ticker
  * falls back to the normal physical lights.
  */
 public final class GammaMaskRenderer {
@@ -96,7 +94,7 @@ public final class GammaMaskRenderer {
 
         GammaMask.LocalBeam beam = GammaMask.beam();
         double target = beam == null ? 0
-                : BeamClientConfig.MASK_STRENGTH.get() * Math.min(15, beam.luminance()) / 15.0 * ambientFactor();
+                : BeamClientConfig.MASK_STRENGTH.get() * Math.min(15, beam.luminance()) / 15.0;
         strength = MaskMath.approach(strength, target, dt, BeamClientConfig.MASK_FADE_SECONDS.get());
         if (beam != null) fading = beam;
         if (strength <= 0.001 || fading == null) {
@@ -108,17 +106,6 @@ public final class GammaMaskRenderer {
             return;
         }
         draw(event, fading);
-    }
-
-    /** 1 in the dark, lower when the camera stands in block or sky light (light engine only, no dynamic lights). */
-    private static double ambientFactor() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null) return 1;
-        BlockPos pos = BlockPos.containing(mc.gameRenderer.getMainCamera().getPosition());
-        int block = mc.level.getBrightness(LightLayer.BLOCK, pos);
-        int sky = mc.level.getBrightness(LightLayer.SKY, pos) - mc.level.getSkyDarken();
-        double ambient = Math.max(block, Math.max(0, sky)) / 15.0;
-        return 1 - BeamClientConfig.MASK_AMBIENT_FADE.get() * MaskMath.smoothstep(0.2, 1.0, ambient);
     }
 
     private static void draw(RenderLevelStageEvent event, GammaMask.LocalBeam b) {
@@ -167,11 +154,8 @@ public final class GammaMaskRenderer {
         s.safeGetUniform("Range").set((float) (b.range() * BeamClientConfig.MASK_RANGE_SCALE.get()));
         s.safeGetUniform("Falloff").set(BeamClientConfig.MASK_FALLOFF.get().floatValue());
         s.safeGetUniform("Strength").set((float) strength);
-        s.safeGetUniform("Gain").set(BeamClientConfig.MASK_GAIN.get().floatValue());
-        s.safeGetUniform("Shading").set(BeamClientConfig.MASK_SHADING.get().floatValue());
-        s.safeGetUniform("Knee").set(BeamClientConfig.MASK_KNEE.get().floatValue());
-        s.safeGetUniform("BrightCutoff").set(BeamClientConfig.MASK_BRIGHT_CUTOFF.get().floatValue());
-        s.safeGetUniform("BlackLift").set(BeamClientConfig.MASK_BLACK_LIFT.get().floatValue());
+        s.safeGetUniform("Gamma").set(BeamClientConfig.MASK_GAMMA.get().floatValue());
+        s.safeGetUniform("Lift").set(BeamClientConfig.MASK_LIFT.get().floatValue());
         s.safeGetUniform("Tint").set(tr, tg, tb);
 
         RenderSystem.disableDepthTest();
