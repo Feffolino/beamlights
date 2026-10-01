@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.9.0 (unreleased)
+- Motion-adaptive light updates (client config section `[motion]`, per emitter: the local player and every other
+  emitter have their own state). Each trace measures the angular speed of the central beam direction (deg/s) and the
+  origin speed (blocks/s), EMA-smoothed (alpha 0.5), and picks a state:
+  - FAST (>= `fastTurnDegPerSec` 90 or >= `fastMoveBlocksPerSec` 8; left only below 0.7x): only the central hit
+    point follows; side rays and midpoints keep their lights (`fastSideMode` FREEZE, default), fade out (FADE) or
+    follow as before (OFF).
+  - MOVING (from `slowTurnDegPerSec` 20 / fastMove / 4 up to fast): side rays and midpoints change at most every
+    `sideUpdateTicks` (3) ticks, the central hit point every tick.
+  - STILL (slow for `settleTicks` 6 ticks in a row): everything follows; for settleTicks ticks the lights go to their
+    exact target ignoring `moveHysteresis`/`luminanceHysteresis` (fixes the hysteresis leftover after a sweep).
+  - Implemented as a target filter before the smoother (held targets are fed again, so smoothing and ghosts are
+    unchanged) plus an `exact` flag on `LightBackend.put` for the resync.
+  - Simulated (9 sources, 180 deg/s for 40 ticks): 37 changes instead of 282 (0.9 per tick, central only), then one
+    settling burst of 35.
+- `maxMovesPerTick` default 12 -> 6; presets quality 16, balanced 6, performance 4 (presets also set the motion
+  keys). A saved `maxMovesPerTick` stays until `/beamlights perf preset balanced` is re-applied.
+- `/beamlights motion [fastTurn|slowTurn|fastMove|sideTicks|settle|mode] [value]` (saved; no value = current value).
+  `/beamlights perf` and `/beamlights status` show the motion keys.
+- Overlay: `motion: FAST 240°/s, 0.0 b/s, suppressed N` (local player's state, side/midpoint changes held back by the
+  governor this tick).
+- Fix: with `/beamlights off` the overlay kept the last beams/points/moves numbers; stats are reset while disabled.
+
 ## 0.8.2 (unreleased)
 - Fewer chunk rebuilds (in-game: 150 moves/s with 8 sources = about 1200 section rebuilds/s, -30 FPS):
   - `moveHysteresis` (default 1.5 blocks) and `centralHysteresis` (0.75, central hit point): a light moves only when

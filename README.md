@@ -25,6 +25,12 @@ shows `moves/s` and the resulting `rebuilds/s ~N`. To measure the FPS cost, togg
 `/beamlights on` (saved, all lights cleared while off) and compare. Any `/beamlights perf|smoothing|layout <key>`
 without a value prints the current value.
 
+Since 0.9.0 updates adapt to motion (`[motion]`, `/beamlights motion ...`): while the beam turns fast (90 deg/s, or
+the emitter moves at 8 blocks/s) only the spot you look at follows and side rays and midpoints keep their lights;
+while moving slower they update every 3 ticks; once still everything snaps to its exact place. A fast camera sweep
+then costs about one light change per tick instead of 7. The overlay shows `motion: FAST 240°/s ...`. Default budget
+`maxMovesPerTick` is now 6 (re-apply `/beamlights perf preset balanced` to update a saved config).
+
 ## Data-driven beams (0.7.0)
 
 Any item can emit a beam through a datapack file `data/<namespace>/beamlights/beams/<name>.json` (KubeJS packs can use

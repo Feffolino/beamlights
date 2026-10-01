@@ -88,7 +88,9 @@ final class PerfCommands {
 
     private static int show(CommandContext<CommandSourceStack> c) {
         BeamClientCommands.reply(c, "Performance: " + settingsLine());
+        BeamClientCommands.reply(c, "Motion: " + MotionCommands.settingsLine());
         BeamClientCommands.reply(c, BeamClientTicker.STATS.perfLine());
+        BeamClientCommands.reply(c, BeamClientTicker.STATS.motionLine());
         return 1;
     }
 
@@ -97,16 +99,26 @@ final class PerfCommands {
     private static int preset(CommandContext<CommandSourceStack> c) {
         String name = StringArgumentType.getString(c, "name").toLowerCase(Locale.ROOT);
         switch (name) {
-            case "quality" -> apply(false, 32, 1, 48, 6.0, 0.5, 0.25, 0, 4, 1);
-            case "balanced" -> apply(true, 12, 2, 24, 6.0, 1.5, 0.75, 1, 2, 2);
-            case "performance" -> apply(true, 6, 4, 16, 8.0, 2.0, 1.0, 1, 2, 3);
+            case "quality" -> {
+                apply(false, 16, 1, 48, 6.0, 0.5, 0.25, 0, 4, 1);
+                MotionCommands.apply(180.0, 30.0, 12.0, 2, 4);
+            }
+            case "balanced" -> {
+                apply(true, 6, 2, 24, 6.0, 1.5, 0.75, 1, 2, 2);
+                MotionCommands.apply(90.0, 20.0, 8.0, 3, 6);
+            }
+            case "performance" -> {
+                apply(true, 4, 4, 16, 8.0, 2.0, 1.0, 1, 2, 3);
+                MotionCommands.apply(60.0, 15.0, 6.0, 4, 8);
+            }
             default -> {
                 BeamClientCommands.reply(c, "Unknown preset " + name + ", one of " + PRESETS);
                 return 0;
             }
         }
         BeamClientConfig.SPEC.save();
-        BeamClientCommands.reply(c, "Preset " + name + " applied (saved): " + settingsLine());
+        BeamClientCommands.reply(c, "Preset " + name + " applied (saved): " + settingsLine() + "; motion "
+                + MotionCommands.settingsLine());
         return 1;
     }
 

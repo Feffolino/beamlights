@@ -44,6 +44,7 @@ public final class SdlBackend implements LightBackend {
     private V3 viewer = V3.ZERO;
     private int budget;
     private SourceMotion.Gate gate = SourceMotion.Gate.legacy(0.25);
+    private SourceMotion.Gate exactGate = gate;
     private int deferred;
 
     private SdlBackend(SodiumDynamicLights sdl) {
@@ -72,10 +73,16 @@ public final class SdlBackend implements LightBackend {
         this.gate = new SourceMotion.Gate(BeamClientConfig.MOVE_THRESHOLD.get(),
                 BeamClientConfig.MOVE_HYSTERESIS.get(), BeamClientConfig.CENTRAL_HYSTERESIS.get(),
                 BeamClientConfig.LUMINANCE_HYSTERESIS.get());
+        this.exactGate = gate.exact();
     }
 
     @Override
     public void put(long key, V3 pos, int luminance, boolean priority) {
+        put(key, pos, luminance, priority, false);
+    }
+
+    @Override
+    public void put(long key, V3 pos, int luminance, boolean priority, boolean exact) {
         seen.add(key);
         Level level = Minecraft.getInstance().level;
         BeamLightSource src = sources.get(key);
@@ -87,7 +94,8 @@ public final class SdlBackend implements LightBackend {
         double displacement;
         if (src != null && src.hasPosition()) {
             double d = src.distSq(pos);
-            if (!SourceMotion.shouldChange(d, src.luminance(), luminance, Keys.isCentralHit(key), gate)) {
+            if (!SourceMotion.shouldChange(d, src.luminance(), luminance, Keys.isCentralHit(key),
+                    exact ? exactGate : gate)) {
                 SodiumDynamicLights.updateTracking(src);
                 return;
             }

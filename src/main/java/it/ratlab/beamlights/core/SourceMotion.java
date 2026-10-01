@@ -27,6 +27,11 @@ public final class SourceMotion {
         public static Gate legacy(double threshold) {
             return new Gate(threshold, 0, 0, 0);
         }
+
+        /** Resync after the emitter settles (motion STILL): moveThreshold only, every luminance change. */
+        public Gate exact() {
+            return new Gate(threshold, 0, 0, 0);
+        }
     }
 
     /**

@@ -15,6 +15,7 @@ import it.ratlab.beamlights.core.LightPointPlanner;
 import it.ratlab.beamlights.core.LightPointPlanner.PlannedPoint;
 import it.ratlab.beamlights.core.LightPointPlanner.Status;
 import it.ratlab.beamlights.core.LightSmoother;
+import it.ratlab.beamlights.core.MotionGovernor;
 import it.ratlab.beamlights.core.RayLayout;
 import it.ratlab.beamlights.core.RaySpec;
 import it.ratlab.beamlights.core.SourceMotion;
@@ -35,8 +36,10 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Per tick: collect beams near the player, trace, plan light points, smooth them, feed the backend. */
 @EventBusSubscriber(modid = BeamLights.MOD_ID, value = Dist.CLIENT)
@@ -77,6 +80,7 @@ public final class BeamClientTicker {
         if (level == null || player == null || !BeamClientConfig.ENABLED.get()) {
             if (lastLevel != null || !BeamClientConfig.ENABLED.get()) safeClear();
             lastLevel = null;
+            STATS.reset();
             DebugState.setLastFrame(List.of());
             return;
         }
@@ -173,7 +177,9 @@ public final class BeamClientTicker {
     private static final class EmitterCache {
         final List<LightSmoother.Target> targets = new ArrayList<>();
         final List<TracedBeam> frame = new ArrayList<>();
+        final MotionGovernor motion = new MotionGovernor();
         long lastSeen;
+        long lastTraced;
         boolean traced;
         boolean lod;
     }
@@ -185,6 +191,9 @@ public final class BeamClientTicker {
     private static final List<Beam> BEAMS = new ArrayList<>();
     private static final List<String> SOURCES = new ArrayList<>();
     private static final List<V3> SHARED = new ArrayList<>();
+    private static final List<LightSmoother.Target> FRESH = new ArrayList<>();
+    /** Entity ids whose emitter just settled (MotionGovernor resync): their lights skip the hysteresis. */
+    private static final Set<Integer> RESYNC = new HashSet<>();
     private static long tickCounter;
 
     private static void tick(ClientLevel level, LocalPlayer player, LightBackend b) {
@@ -212,6 +221,8 @@ public final class BeamClientTicker {
         List<RaySpec> layout = layout();
         int perEntity = BeamClientConfig.MAX_SOURCES_PER_ENTITY.get();
         LevelOcclusion occlusion = new LevelOcclusion(level);
+        MotionGovernor.Settings motion = BeamClientConfig.motionSettings();
+        RESYNC.clear();
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -236,6 +247,7 @@ public final class BeamClientTicker {
             EmitterCache cache = EMITTER_CACHE.computeIfAbsent(e.getId(), id -> new EmitterCache());
             cache.lastSeen = tick;
             if (reduced) STATS.lodEmitters++;
+            if (cache.motion.resync()) RESYNC.add(e.getId());
             // Remote emitters: reuse the last points between re-traces (an LOD change forces a re-trace).
             if (!local && cache.traced && cache.lod == reduced && !SourceMotion.remoteDue(e.getId(), tick, interval)) {
                 targets.addAll(cache.targets);
@@ -248,6 +260,8 @@ public final class BeamClientTicker {
             cache.targets.clear();
             cache.frame.clear();
             shared.clear();
+            List<LightSmoother.Target> fresh = FRESH;
+            fresh.clear();
             BeamRegistry.INSTANCE.collect(e, 1.0f, beams, sources);
             // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
@@ -284,7 +298,7 @@ public final class BeamClientTicker {
                                 STATS.capped++;
                                 continue;
                             }
-                            cache.targets.add(new LightSmoother.Target(Keys.of(e.getId(), ray, p.slot()), p.pos(),
+                            fresh.add(new LightSmoother.Target(Keys.of(e.getId(), ray, p.slot()), p.pos(),
                                     p.luminance()));
                             entityUsed++;
                         }
@@ -296,6 +310,17 @@ public final class BeamClientTicker {
                     }
                 }
             }
+            // Motion: measured on every trace; side rays and midpoints may be held while the beam turns fast.
+            if (beamCount > 0) {
+                int elapsed = cache.lastTraced == 0 ? 1 : (int) Math.min(100, tick - cache.lastTraced);
+                cache.motion.observe(beams.get(0).origin(), beams.get(0).dir(), elapsed, motion);
+            }
+            cache.lastTraced = tick;
+            cache.motion.filter(fresh, cache.targets, motion);
+            STATS.suppressed += cache.motion.suppressed();
+            if (cache.motion.resync()) RESYNC.add(e.getId());
+            if (local) STATS.setMotion(cache.motion.state(), cache.motion.turnDegPerSec(),
+                    cache.motion.moveBlocksPerSec(), cache.motion.resync());
             targets.addAll(cache.targets);
             if (frame != null) frame.addAll(cache.frame);
         }
@@ -319,7 +344,7 @@ public final class BeamClientTicker {
             V3 pos = snap ? SourceMotion.snapToBlock(o.pos()) : o.pos();
             boolean priority = !o.ghost() && Keys.entityId(o.key()) == localId
                     && Keys.ray(o.key()) % RAYS_PER_BEAM == 0;
-            b.put(o.key(), pos, o.luminance(), priority);
+            b.put(o.key(), pos, o.luminance(), priority, !o.ghost() && RESYNC.contains(Keys.entityId(o.key())));
             used++;
             if (o.ghost()) STATS.ghosts++;
         }

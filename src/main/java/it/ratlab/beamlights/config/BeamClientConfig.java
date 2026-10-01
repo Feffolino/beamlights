@@ -1,5 +1,6 @@
 package it.ratlab.beamlights.config;
 
+import it.ratlab.beamlights.core.MotionGovernor;
 import it.ratlab.beamlights.core.RayLayout;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -147,7 +148,7 @@ public final class BeamClientConfig {
     public static final ModConfigSpec.IntValue MAX_MOVES_PER_TICK = B
             .comment("Max light source changes (move, luminance change, new, removed) applied per tick; the rest waits",
                     "for the next tick. Local player's central ray first, then nearest. 0 = unlimited.")
-            .defineInRange("maxMovesPerTick", 12, 0, 512);
+            .defineInRange("maxMovesPerTick", 6, 0, 512);
     public static final ModConfigSpec.IntValue REMOTE_UPDATE_INTERVAL = B
             .comment("Beams of other players and entities are re-traced every N ticks (staggered by entity id); in",
                     "between their last light points are reused. 1 = every tick.")
@@ -177,9 +178,47 @@ public final class BeamClientConfig {
         B.pop();
     }
 
+    // Motion: per emitter, side rays and midpoints update less while the beam turns or moves fast.
+    static {
+        B.comment("Motion-adaptive updates, per emitter (local player and every other emitter on its own). While the",
+                "beam turns or moves fast only the central hit point follows; side rays and midpoints keep their",
+                "lights. Presets: /beamlights perf preset ...; keys: /beamlights motion ...").push("motion");
+    }
+
+    public static final ModConfigSpec.DoubleValue FAST_TURN = B
+            .comment("FAST at this angular speed of the beam (degrees/s) or more; left below 0.7 x this value.")
+            .defineInRange("fastTurnDegPerSec", 90.0, 1.0, 3600.0);
+    public static final ModConfigSpec.DoubleValue SLOW_TURN = B
+            .comment("Below this angular speed (degrees/s) and fastMoveBlocksPerSec / 4 the emitter counts as slow;",
+                    "settleTicks slow ticks in a row = STILL. Between slow and fast = MOVING.")
+            .defineInRange("slowTurnDegPerSec", 20.0, 0.0, 3600.0);
+    public static final ModConfigSpec.DoubleValue FAST_MOVE = B
+            .comment("FAST at this origin speed (blocks/s) or more (sprinting is about 5.6).")
+            .defineInRange("fastMoveBlocksPerSec", 8.0, 0.5, 200.0);
+    public static final ModConfigSpec.IntValue SIDE_UPDATE_TICKS = B
+            .comment("While MOVING, side rays and midpoints change at most every N ticks (central hit point every tick).")
+            .defineInRange("sideUpdateTicks", 3, 1, 40);
+    public static final ModConfigSpec.IntValue SETTLE_TICKS = B
+            .comment("Slow ticks in a row before STILL; on reaching STILL every light goes to its exact target",
+                    "(no hysteresis) for this many ticks.")
+            .defineInRange("settleTicks", 6, 1, 40);
+    public static final ModConfigSpec.EnumValue<MotionGovernor.SideMode> FAST_SIDE_MODE = B
+            .comment("Side rays and midpoints while FAST: FREEZE = keep their lights; FADE = fade them out;",
+                    "OFF = no motion adaptation (they follow like the central ray).")
+            .defineEnum("fastSideMode", MotionGovernor.SideMode.FREEZE);
+
+    static {
+        B.pop();
+    }
+
     public static final ModConfigSpec SPEC = B.build();
 
     private BeamClientConfig() {
+    }
+
+    public static MotionGovernor.Settings motionSettings() {
+        return new MotionGovernor.Settings(FAST_TURN.get(), SLOW_TURN.get(), FAST_MOVE.get(), SIDE_UPDATE_TICKS.get(),
+                SETTLE_TICKS.get(), FAST_SIDE_MODE.get());
     }
 
     public static int luminanceForTier(int tier) {

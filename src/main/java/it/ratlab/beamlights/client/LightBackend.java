@@ -18,6 +18,14 @@ public interface LightBackend {
     /** priority = local player's central ray: its changes are applied first. */
     void put(long key, V3 pos, int luminance, boolean priority);
 
+    /**
+     * exact = the emitter just settled (MotionGovernor resync): the light goes to its exact target, ignoring
+     * moveHysteresis and luminanceHysteresis.
+     */
+    default void put(long key, V3 pos, int luminance, boolean priority, boolean exact) {
+        put(key, pos, luminance, priority);
+    }
+
     void end();
 
     /** Removes every light this backend created. */
