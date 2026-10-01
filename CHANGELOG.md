@@ -1,6 +1,18 @@
 # Changelog
 
-## 1.1.3 (unreleased)
+## 1.1.3 - first public release (Minecraft 1.21.1, NeoForge)
+- Directional beam light through Sodium Dynamic Lights or LambDynamicLights: hit point, optional midpoints and side
+  rays in configurable layouts (single, triangle, cross, ring, double ring, fans, custom).
+- LambDynamicLights cone light indoors; indoor / outdoor layouts with hysteresis and open-sky detection; per-provider
+  layout profiles in resource packs (`assets/<ns>/beamlights/layouts`).
+- Smoothing, motion-adaptive updates, change budget, distance LOD, performance presets.
+- Server: no monster spawns inside lit beams, optional weak mob attraction (game rules).
+- Native Omega Flashlight support; datapack beam definitions (items, tags, Curios, components); Java API,
+  `BeamCollectEvent`, item data, KubeJS bindings.
+- `/beamlights` client command for status, every setting and diagnostics.
+
+# Development history (unpublished builds)
+### 1.1.3
 - `openAreaPattern` ([cone], default CENTER_ONLY): with `ldlConeLight` on, beams that get no cone (open area: hit
   farther than `coneMaxDistanceForCone`, or no hit) use this side ray pattern instead of `rayPattern`, e.g.
   `rayPattern = CENTER_ONLY` + `openAreaPattern = RING` = cone indoors, ring outdoors.
@@ -17,7 +29,7 @@
 - Overlay line `area:` shows CONE / OPEN, how long, hit distance, sky light and the thresholds.
 - `/beamlights cone openHysteresis|openMinTicks|openSky|openSkyLight|openFade [value]`.
 
-## 1.1.0 (unreleased)
+### 1.1.0
 Cone light performance (LDL `ldlConeLight`). Measured outdoors in a Lost Cities city (LambDynamicLights 4.8.11,
 CENTER_ONLY): 50 FPS with the cone vs 100 without; LDL went from 2.1 % to 10.4 % of the render thread (per
 entity/particle light lookups, spatial lookup rebuild) and Sodium from 10.0 % to 14.6 % (section rebuilds), because the
@@ -38,7 +50,7 @@ cone's bounding box was huge (range 22, half-angle 42, loose cube).
 - Tests: `ConeLightTest` (tight bounds, cell count, fast path vs reference on random points, soft edge),
   `ConePolicyTest` (caps, max distance, min length, hysteresis, freeze). 144 tests.
 
-## 1.0.1 (unreleased)
+### 1.0.1
 - Cone light smoothing (LDL `ldlConeLight`, needs `smoothing`): a cone length jump (near face to far face,
   >= `jumpDistance`) is walked in `coneSteps` (new, default 3, `/beamlights smoothing conesteps <n>`) equal steps,
   one every `glideMinTicks` ticks; smaller changes lerp by `smoothFactor`; a vanished cone fades out over
@@ -46,7 +58,7 @@ cone's bounding box was huge (range 22, half-angle 42, loose cube).
   through the existing change gate and move budget. Hit point lights already crossfaded in LDL mode (they pass
   through LightSmoother like with SDL).
 
-## 1.0.0 (unreleased)
+### 1.0.0
 All five phases of the design are done: 1 single-beam dynamic light (SDL), 2 multi-ray cone, 3 spawn blocking (and
 optional mob attraction), 4 data-driven beams (datapack, Java API, item component, KubeJS), 5 LambDynamicLights
 backend. Version bumped to 1.0.0.
@@ -64,7 +76,7 @@ backend. Version bumped to 1.0.0.
   LambDynamicLights)".
 - Tests: `ConeLightTest` (axis fade, cone radius, apex sphere, past-the-end falloff, bounds cover every lit block).
 
-## 0.9.0 (unreleased)
+### 0.9.0
 - Motion-adaptive light updates (client config section `[motion]`, per emitter: the local player and every other
   emitter have their own state). Each trace measures the angular speed of the central beam direction (deg/s) and the
   origin speed (blocks/s), EMA-smoothed (alpha 0.5), and picks a state:
@@ -87,7 +99,7 @@ backend. Version bumped to 1.0.0.
   governor this tick).
 - Fix: with `/beamlights off` the overlay kept the last beams/points/moves numbers; stats are reset while disabled.
 
-## 0.8.2 (unreleased)
+### 0.8.2
 - Fewer chunk rebuilds (in-game: 150 moves/s with 8 sources = about 1200 section rebuilds/s, -30 FPS):
   - `moveHysteresis` (default 1.5 blocks) and `centralHysteresis` (0.75, central hit point): a light moves only when
     its target is that far from the shown position (with snapToBlock: another block and that distance).
@@ -106,14 +118,14 @@ backend. Version bumped to 1.0.0.
   so the immediate dump always caught a still beam and printed `moved=false` for every point; it now also logs the
   applied/deferred change counts and ghost changes.
 
-## 0.8.1 (unreleased)
+### 0.8.1
 - Beam item data moved from the registered data component `beamlights:beam` to the vanilla `minecraft:custom_data`
   component, key `"beamlights:beam"` (same fields). The mod registers nothing in a synced registry again, so it is
   optional on both sides. API: `beamComponent()` replaced by `getBeam/setBeam/clearBeam(ItemStack)`; KubeJS
   `BeamLights.setBeam/getBeam/clearBeam(item)`; `BeamItemData.STREAM_CODEC` removed. Decoded data is cached per
   CustomData instance; invalid data is ignored and logged once per message.
 
-## 0.8.0 (unreleased)
+### 0.8.0
 - Public API (package `it.ratlab.beamlights.api`, `API_VERSION = 1`): `BeamLightsApi.register/unregister`,
   `isBeamActive(entity)`, `getBeams(entity)` (snapshot), `providerNames()`, `getBeam/setBeam/clearBeam(stack)`; Javadoc on every API
   type. `V3` moved from `core.math` to `api.math` (the API jar is self-contained). `Beam.of(Vec3, ...)` and
@@ -136,7 +148,7 @@ backend. Version bumped to 1.0.0.
 - Overlay line `perf:` (moves applied/deferred, snap, LOD and reused emitters); `/beamlights perf [show]`,
   `/beamlights perf snap|budget|interval|lod|sectionmerge <v>`, `/beamlights perf preset quality|balanced|performance`.
 
-## 0.7.0 (unreleased)
+### 0.7.0
 - Data-driven beams: datapack files `data/<ns>/beamlights/beams/*.json` (items or item tags, slots
   mainhand/offhand/head/curios, luminance, range, cone, colour, optional data component condition `present`/`equals`,
   origin offset, priority). Loaded by a server reload listener, invalid files logged and skipped; synced to clients
@@ -148,7 +160,7 @@ backend. Version bumped to 1.0.0.
 - `/beamlights status` shows the number of synced data definitions; `/beamlights debug dump` prints the provider of
   each ray. Examples in `examples/datapack` (not shipped in the jar).
 
-## 0.6.0 (unreleased)
+### 0.6.0
 - Smooth light movement (`core/LightSmoother`, between ticker and backend): small moves glide
   (`smoothFactor`, default 0.5), jumps of at least `jumpDistance` (default 3) blocks crossfade (a ghost fades out at the
   old spot while the light fades in at the new one), new lights fade in and vanished lights fade out over `fadeTicks`
@@ -156,7 +168,7 @@ backend. Version bumped to 1.0.0.
 - `/beamlights smoothing [on|off]|factor <v>|jump <v>|fade <ticks>` (saved at once); `/beamlights status` shows the
   smoothing settings and the overlay the ghost count. `maxSources` now caps the smoothed output (ghosts first to go).
 
-## 0.5.0 (unreleased)
+### 0.5.0
 - On/off switches are now game rules (per world): `beamlightsBlockSpawns` (SPAWNING, default true) and
   `beamlightsAttractMobs` (MOBS, default false). Config keys `blockSpawnsInBeam` and `beamAttractsMobs` removed.
 - Op commands `/beamlightsspawns` and `/beamlightsattract` removed. `/beamlights spawns|attract [on|off]` forwards
@@ -169,14 +181,14 @@ backend. Version bumped to 1.0.0.
   |preset <default|wide|performance|cliff|floodlight>` edits the ray layout in the client config (saved at once,
   applied on the next frame). `/beamlights status` names the two game rules.
 
-## 0.4.0 (unreleased)
+### 0.4.0
 - Configurable ray layout: `rays` replaced by `rayPattern` (CENTER_ONLY, TRIANGLE default = old layout, CROSS, RING,
   DOUBLE_RING, FAN_HORIZONTAL, FAN_VERTICAL, CUSTOM) with `sideRays`, `rayRollOffset`, `innerRays`, `innerSpread`,
   `customRays` ("spread,roll[,lumOffset[,midpoints[,rangeFactor]]]", invalid entries skipped and logged) and
   `sideRangeFactor`; at most 24 side rays. New per-emitter budget `maxSourcesPerEntity` (central rays placed first).
   Key ray index is now beamIndex * 32 + subRay. Overlay and /beamlights status show the layout.
 
-## 0.3.0 (unreleased)
+### 0.3.0
 - Phase 3: server-side spawn blocking. Natural monster spawns inside the cone of a lit beam (same range, angle and
   transparency rule as the light) are cancelled via FinalizeSpawnEvent. Server config beamlights-server.toml
   (blockSpawnsInBeam, spawnCheckRange, debugLog), op command /beamlightsspawns. Omega provider is now server-safe and
@@ -185,10 +197,10 @@ backend. Version bumped to 1.0.0.
   (central ray only, checked every attractInterval ticks). Config keys beamAttractsMobs, attractRadius,
   attractInterval, attractMaxMobs, attractSpeed, attractRepathDistance; op command /beamlightsattract.
 
-## 0.2.0 (unreleased)
+### 0.2.0
 - Phase 2: multi-ray cone (central ray + 3 side rays: down, up-right, up-left) with cross-ray merge; config keys
   rays, coneSpread, sideLuminanceOffset, sideMidpoints; side rays drawn grey in the debug render.
 
-## 0.1.0 (unreleased)
+### 0.1.0
 - Phase 1: one ray per beam, hit light + midpoints, Sodium Dynamic Lights backend, Omega Flashlight (held and placed),
   debug overlay/render/commands.

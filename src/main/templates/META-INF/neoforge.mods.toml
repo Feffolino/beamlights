@@ -1,11 +1,14 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
+issueTrackerURL="https://github.com/Feffolino/beamlights/issues"
 
 [[mods]]
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
+displayURL="https://github.com/Feffolino/beamlights"
+logoFile="beamlights_logo.png"
 authors="Rat Lab"
 credits="Thanks to the NeoForge, Sodium Dynamic Lights, LambDynamicLights and Omega Flashlight authors."
 # Not required on the other side: client light and server spawn blocking each work alone.

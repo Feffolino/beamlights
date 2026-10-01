@@ -1,126 +1,78 @@
 # Beam Lights
 
-Directional dynamic light for flashlights and lamps on NeoForge 1.21.1. The beam lights the block it hits and the
-path along the way through Sodium Dynamic Lights or LambDynamicLights (whichever is installed; they exclude each
-other). Native Omega Flashlight support.
+Directional dynamic light for flashlights, helmet lamps and headlights on **NeoForge 1.21.1**.
+A light beam lights the block it hits and the path along the way, instead of a round glow around the player.
 
-Build: `JAVA_HOME="/c/Program Files/Java/jdk-25" ./gradlew build` (jar in `build/libs/`).
-Debug: `/beamlights status`, `/beamlights debug overlay on`, `/beamlights debug render on`, `/beamlights debug dump`.
+## Features
 
-Mod and pack developers: see [DEVELOPERS.md](DEVELOPERS.md) (Java API, `BeamCollectEvent`, the `beamlights:beam` item
-component, KubeJS, Maven artifacts).
+- **Real beam light**: the hit point (and optionally points along the ray and side rays inside the cone) become
+  dynamic lights, so the spot you point at is actually lit.
+- **Cone light** (LambDynamicLights): a cone of light along the beam indoors.
+- **Indoor / outdoor layouts**: indoors the beam can use the cone and one ray layout, outdoors (far hit, no hit or open
+  sky) another one, with hysteresis so it never flickers at the threshold. Patterns: single ray, triangle, cross, ring,
+  double ring, horizontal / vertical fan, custom.
+- **Smooth**: lights glide and cross-fade, update less while you turn fast, and respect a per-tick change budget to
+  keep chunk rebuilds (and FPS cost) low.
+- **Mobs** (server, game rules): no natural monster spawns inside lit beams (`beamlightsBlockSpawns`, on by default);
+  optional weak attraction of idle mobs to the lit spot (`beamlightsAttractMobs`, off by default).
+- **Omega Flashlight**: native support (hand-held and placed flashlights, bulb tiers, flicker).
+- **Any item**: datapack JSON beam definitions (items or tags, hands, armor, Curios slots, colour, range, cone,
+  conditions on item components), a Java API, an event and KubeJS bindings.
+- **Per-source layouts**: resource-pack JSON (`assets/<ns>/beamlights/layouts/*.json`) picks indoor / outdoor layout
+  and cone per beam provider; works from KubeJS `kubejs/assets`.
 
-## LambDynamicLights backend (1.0.0)
+## Requirements
 
-With LambDynamicLights 4.8+ (instead of Sodium Dynamic Lights) every light point becomes an LDL custom light behavior;
-LDL computes the light and rebuilds chunk sections itself. Same gating and budget as with SDL. Optional
-`ldlConeLight = true` (client config) adds a cone of light along each central beam (`ldlConeLuminanceOffset`, -3).
+| Mod | Needed for |
+|---|---|
+| NeoForge 21.1+ for Minecraft 1.21.1 | required |
+| [Sodium Dynamic Lights](https://www.curseforge.com/minecraft/mc-mods/sodium-dynamic-lights) **or** [LambDynamicLights](https://www.curseforge.com/minecraft/mc-mods/lambdynamiclights) | the visible light (client); the cone needs LambDynamicLights |
+| Omega Flashlight 1.6.6+ (optional) | flashlight beams out of the box |
+| Curios (optional) | beam items in Curios slots |
+| KubeJS (optional) | script bindings |
 
-### Cone light (1.1.0)
+Without a dynamic lights mod nothing is drawn, but spawn blocking still works on the server.
 
-The cone is meant for indoor and near hits: outdoors a long, wide cone made LDL evaluate it for every entity and
-particle and rebuild many sections (50 vs 100 FPS measured). Client config section `[cone]`, all keys also editable
-with `/beamlights cone <key> [value]` (no value = show; `/beamlights cone` shows all; saved at once):
+**Sides**: install on the client for the light, on the server for spawn blocking, mob attraction and datapack beam
+definitions. Each side works alone; players without the mod can join a server that has it.
 
-| Key | Command | Default | Meaning |
-|---|---|---|---|
-| `ldlConeLight` | `enabled` | false | cone on/off (in `[performance]`, name unchanged) |
-| `ldlConeLuminanceOffset` | `luminanceOffset` | -3 | cone level relative to the beam (in `[performance]`) |
-| `coneMaxAngle` | `maxAngle` | 25 | half-angle cap in degrees, 5..60 (the visual beam keeps its angle) |
-| `coneMaxLength` | `maxLength` | 16 | length cap in blocks, 4..48 |
-| `coneMinLength` | `minLength` | 3 | shorter beams get no cone, only the point lights |
-| `coneMaxDistanceForCone` | `maxDistance` | 20 | farther hits or no hit (sky): no cone, it fades out |
-| `coneEndFactor` | `endFactor` | 0.5 | level at the end relative to the apex, 0.1..1 |
-| `coneEdgeSoftness` | `edgeSoftness` | 0.25 | outer fraction of the radius fading to half at the rim, 0..1 |
-| `coneFreezeWhenFast` | `freezeWhenFast` | true | keep the cone while the beam turns or moves fast |
-| `coneLengthHysteresis` | `lengthHysteresis` | 2.0 | length change (blocks) that updates the cone |
-| `coneApexHysteresis` | `apexHysteresis` | 1.0 | apex move (blocks) that updates the cone |
-| `coneAngleHysteresis` | `angleHysteresis` | 4 | direction change (degrees) that updates the cone |
+## Commands (client)
 
-Presets: `/beamlights cone preset light` (angle 18, length 12, max distance 14), `balanced` (the defaults), `wide`
-(angle 35, length 24, max distance 28); all keep `freezeWhenFast` on and reset min length and hysteresis to the
-defaults.
+Everything is under `/beamlights` and saved to `config/beamlights-client.toml` at once:
 
-Manual test (the dev run has neither mod):
-1. In a test instance remove Sodium Dynamic Lights and install LambDynamicLights 4.8.x for 1.21.1 (with its
-   dependencies), plus this jar.
-2. `/beamlights status`: backend `lambdynamiclights`, status `LDL mode FANCY` (or the mode set in LDL's options).
-3. Turn a flashlight on: hit point and midpoints lit, lights follow the beam; `/beamlights debug overlay on` shows
-   sources and moves.
-4. LDL options, mode OFF: beam lights disappear; back on: they return.
-5. Set `ldlConeLight = true` in `beamlights-client.toml`, `/beamlights reload`: a soft cone along the beam, the status
-   line shows `N cones`; turning fast stays within `maxMovesPerTick`.
-6. Leave and rejoin the world / change dimension: no leftover lights.
+| Command | What |
+|---|---|
+| `/beamlights` / `status` | backend, sources, layout and every setting group |
+| `/beamlights on` / `off` | quick on/off (A/B test) |
+| `/beamlights layout ...` | ray pattern (indoor), side rays, spread, presets `default`, `wide`, `performance`, `cliff`, `floodlight` |
+| `/beamlights cone ...` | cone light, its size caps, outdoor pattern (`openArea`) and indoor/outdoor switching |
+| `/beamlights perf preset quality\|balanced\|performance` | performance presets |
+| `/beamlights smoothing ...`, `motion ...` | movement smoothing and motion-adaptive updates |
+| `/beamlights spawns\|attract [on\|off]` | server game rules (needs operator) |
+| `/beamlights debug overlay\|render on\|off`, `debug dump` | diagnostics |
 
-## Performance (0.8.0)
+## Performance tips
 
-The expensive part of dynamic light is not the beam tracing but Sodium re-meshing chunk sections every time a light
-source moves or changes brightness. The client config section `[performance]` limits those changes: `snapToBlock`
-(lights at block centers, default on), `maxMovesPerTick` (budget of light changes per tick, default 12, local
-player's beam first), `remoteUpdateInterval` (other emitters re-traced every N ticks, default 2), `lodDistance` (far
-emitters use only the central ray, default 24 blocks) and `mergeSameSection` (coarser midpoints, default off).
-`/beamlights perf` shows the settings and live counters (also in the debug overlay);
-`/beamlights perf preset quality|balanced|performance` switches all of them at once.
+Each change of a dynamic light rebuilds nearby chunk sections. Fewer rays and a smaller cone cost less:
+`/beamlights perf preset performance`, a single-ray layout outdoors, or `/beamlights cone preset light`.
+The debug overlay shows moves/s and estimated rebuilds/s.
 
-Since 0.8.2 lights also lag a little to save changes: `moveHysteresis` (1.5 blocks; `centralHysteresis` 0.75 for the
-spot you look at), `luminanceHysteresis`, and fewer smoothing steps (`glideMinTicks`, `fadeSteps`). The debug overlay
-shows `moves/s` and the resulting `rebuilds/s ~N`. To measure the FPS cost, toggle the mod with `/beamlights off` and
-`/beamlights on` (saved, all lights cleared while off) and compare. Any `/beamlights perf|smoothing|layout <key>`
-without a value prints the current value.
+## For pack and mod developers
 
-Since 0.9.0 updates adapt to motion (`[motion]`, `/beamlights motion ...`): while the beam turns fast (90 deg/s, or
-the emitter moves at 8 blocks/s) only the spot you look at follows and side rays and midpoints keep their lights;
-while moving slower they update every 3 ticks; once still everything snaps to its exact place. A fast camera sweep
-then costs about one light change per tick instead of 7. The overlay shows `motion: FAST 240°/s ...`. Default budget
-`maxMovesPerTick` is now 6 (re-apply `/beamlights perf preset balanced` to update a saved config).
+- Datapack beams: `data/<ns>/beamlights/beams/*.json`, examples in [`examples/datapack`](examples/datapack).
+- Layout profiles: `assets/<ns>/beamlights/layouts/*.json`, example in [`examples/resourcepack`](examples/resourcepack).
+- Java API, `BeamCollectEvent`, item data, KubeJS, Maven: [DEVELOPERS.md](DEVELOPERS.md).
+- Every config key in detail: [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
-## Data-driven beams (0.7.0)
+## Building
 
-Any item can emit a beam through a datapack file `data/<namespace>/beamlights/beams/<name>.json` (KubeJS packs can use
-`kubejs/data/<namespace>/beamlights/beams/`). Files are loaded on the server and synced to clients on join and on
-`/reload`; invalid files are logged with their id and skipped.
-
-```json
-{
-  "items": ["minecraft:lantern", "#c:flashlights"],
-  "slots": ["mainhand", "offhand", "head", "curios"],
-  "luminance": 12,
-  "range": 20.0,
-  "cone": 25.0,
-  "color": "#FFE8B0",
-  "condition": { "component": "mymod:enabled", "equals": true },
-  "origin": { "forward": 0.3, "down": 0.2 },
-  "priority": 0
-}
+```bash
+./gradlew build
 ```
 
-| Key | Required | Default | Meaning |
-|---|---|---|---|
-| `items` | yes | | item ids or `#` item tags; unknown items are ignored (optional mods) |
-| `slots` | no | `["mainhand","offhand"]` | `mainhand`, `offhand`, `head`, `curios` (any Curios slot, players only, needs Curios) |
-| `luminance` | yes | | light level 0..15 |
-| `range` | no | 16 | beam length in blocks, 1..128 |
-| `cone` | no | 25 | cone half-angle in degrees, 1..89 |
-| `color` | no | `#FFFFFF` | `#RRGGBB` (kept for colour-capable backends) |
-| `condition` | no | always on | `{"component": id, "present": true}` or `{"component": id, "equals": <json>}`; `equals` compares the component encoded with its codec |
-| `origin` | no | 0 / 0 | offset from the eye: `forward` along the look direction, `down` world-down, -4..4 |
-| `priority` | no | 0 | highest wins when several definitions match the same stack |
+Needs a JDK (the Gradle toolchain downloads Java 21). The jar is `build/libs/beamlights-<version>+1.21.1.jar`.
+Optional mods are compile-only jars in `libs/` (not in the repository, see `build.gradle`).
 
-At most two data beams per entity. Players use every listed slot; other living entities (armor stands, mobs) only
-hands and head. Omega Flashlight items are skipped (native support). Examples in `examples/datapack` (copy it into
-`datapacks/`): a held lantern, and a renamed leather helmet that works as a helmet lamp.
+## License
 
-### Java API, item component and KubeJS
-
-Other mods register a `BeamProvider` with `BeamLightsApi.register(provider)` in common setup, on both sides (the client
-uses beams for light, the server for spawn blocking and mob attraction), or edit beams in `BeamCollectEvent`. A single
-stack gets a beam with the vanilla `custom_data` component under the key `beamlights:beam` (same fields as above, e.g.
-`/give @s minecraft:lantern[minecraft:custom_data={"beamlights:beam":{luminance:12,range:16,cone:35}}]`, the loot
-function `set_custom_data`, or `BeamLights.setBeam(item, {luminance: 12})` in KubeJS). With KubeJS installed, scripts
-also get `BeamLights.isBeamActive(entity)`, `BeamLights.beamCount(entity)`, `BeamLights.beams(entity)` (beams of the
-entity right now, on the entity's side), `BeamLights.getBeam(item)` and `BeamLights.clearBeam(item)`.
-
-Beam Lights is optional on both sides: it registers nothing in a synced registry, so a client with the mod can join a
-server without it and the other way round. A client-only install gives dynamic light for items the client already
-knows (e.g. Omega flashlights, `custom_data` items); server features (spawn blocking, mob attraction, datapack
-definitions) need the mod on the server. Details in [DEVELOPERS.md](DEVELOPERS.md).
+MIT, see [LICENSE](LICENSE).

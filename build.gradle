@@ -9,7 +9,8 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = mod_version
+// Jar: beamlights-<mod version>+<minecraft version>.jar (the mod metadata keeps the plain mod_version).
+version = "${mod_version}+${minecraft_version}"
 group = mod_group_id
 
 base {
@@ -34,6 +35,10 @@ neoForge {
     runs {
         client {
             client()
+        }
+        server {
+            server()
+            programArgument '--nogui'
         }
         configureEach {
             logLevel = org.slf4j.event.Level.DEBUG
