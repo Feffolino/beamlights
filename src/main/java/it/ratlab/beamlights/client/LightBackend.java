@@ -1,6 +1,7 @@
 package it.ratlab.beamlights.client;
 
 import it.ratlab.beamlights.api.math.V3;
+import it.ratlab.beamlights.core.ConeLight;
 
 /**
  * Receives the light points of one tick: begin(), put() for every point, end() removes keys not put this tick.
@@ -24,6 +25,18 @@ public interface LightBackend {
      */
     default void put(long key, V3 pos, int luminance, boolean priority, boolean exact) {
         put(key, pos, luminance, priority);
+    }
+
+    /** True when the backend draws cone lights along central beams (putBeam); LambDynamicLights only. */
+    default boolean wantsBeams() {
+        return false;
+    }
+
+    /**
+     * Cone light along a central beam, between begin() and end() like put(); key = Keys.of(entity, ray,
+     * ConeLight.SLOT). Cones not put this tick are removed in end().
+     */
+    default void putBeam(long key, ConeLight.Shape cone, boolean priority, boolean exact) {
     }
 
     void end();

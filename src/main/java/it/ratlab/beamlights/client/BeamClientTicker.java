@@ -9,6 +9,7 @@ import it.ratlab.beamlights.client.debug.TracedBeam;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
+import it.ratlab.beamlights.core.ConeLight;
 import it.ratlab.beamlights.core.ConeRays;
 import it.ratlab.beamlights.core.Keys;
 import it.ratlab.beamlights.core.LightPointPlanner;
@@ -177,6 +178,7 @@ public final class BeamClientTicker {
     private static final class EmitterCache {
         final List<LightSmoother.Target> targets = new ArrayList<>();
         final List<TracedBeam> frame = new ArrayList<>();
+        final List<ConeTarget> cones = new ArrayList<>();
         final MotionGovernor motion = new MotionGovernor();
         long lastSeen;
         long lastTraced;
@@ -184,7 +186,12 @@ public final class BeamClientTicker {
         boolean lod;
     }
 
+    /** Cone light of one central beam (LambDynamicLights ldlConeLight). */
+    private record ConeTarget(long key, ConeLight.Shape shape) {
+    }
+
     // Reused every tick (client thread only).
+    private static final List<ConeTarget> CONES = new ArrayList<>();
     private static final Map<Integer, EmitterCache> EMITTER_CACHE = new HashMap<>();
     private static final List<Entity> EMITTERS = new ArrayList<>();
     private static final List<LightSmoother.Target> TARGETS = new ArrayList<>();
@@ -223,6 +230,9 @@ public final class BeamClientTicker {
         LevelOcclusion occlusion = new LevelOcclusion(level);
         MotionGovernor.Settings motion = BeamClientConfig.motionSettings();
         RESYNC.clear();
+        CONES.clear();
+        boolean cones = b.wantsBeams();
+        int coneOffset = BeamClientConfig.LDL_CONE_LUMINANCE_OFFSET.get();
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -251,6 +261,7 @@ public final class BeamClientTicker {
             // Remote emitters: reuse the last points between re-traces (an LOD change forces a re-trace).
             if (!local && cache.traced && cache.lod == reduced && !SourceMotion.remoteDue(e.getId(), tick, interval)) {
                 targets.addAll(cache.targets);
+                CONES.addAll(cache.cones);
                 if (frame != null) frame.addAll(cache.frame);
                 STATS.reusedEmitters++;
                 continue;
@@ -259,6 +270,7 @@ public final class BeamClientTicker {
             cache.lod = reduced;
             cache.targets.clear();
             cache.frame.clear();
+            cache.cones.clear();
             shared.clear();
             List<LightSmoother.Target> fresh = FRESH;
             fresh.clear();
@@ -287,6 +299,12 @@ public final class BeamClientTicker {
                                 : beam;
                         BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(),
                                 occlusion);
+                        if (cones && !side) {
+                            int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
+                            double len = trace.hit() ? Math.max(0, trace.distance() - HIT_BACKOFF) : rayBeam.range();
+                            if (coneLum > 0) cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT),
+                                    new ConeLight.Shape(rayBeam.origin(), rayBeam.dir(), len, beam.coneDeg(), coneLum)));
+                        }
                         LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)
                                 : spec.midpoints() ? sideMid : settingsNoMid;
                         LightPointPlanner.Plan plan = LightPointPlanner.plan(rayBeam.origin(), rayBeam.dir(), trace,
@@ -322,6 +340,7 @@ public final class BeamClientTicker {
             if (local) STATS.setMotion(cache.motion.state(), cache.motion.turnDegPerSec(),
                     cache.motion.moveBlocksPerSec(), cache.motion.resync());
             targets.addAll(cache.targets);
+            CONES.addAll(cache.cones);
             if (frame != null) frame.addAll(cache.frame);
         }
         EMITTER_CACHE.values().removeIf(c -> c.lastSeen != tick);
@@ -347,6 +366,10 @@ public final class BeamClientTicker {
             b.put(o.key(), pos, o.luminance(), priority, !o.ghost() && RESYNC.contains(Keys.entityId(o.key())));
             used++;
             if (o.ghost()) STATS.ghosts++;
+        }
+        for (ConeTarget c : CONES) {
+            int id = Keys.entityId(c.key());
+            b.putBeam(c.key(), c.shape(), id == localId, RESYNC.contains(id));
         }
         b.end();
 

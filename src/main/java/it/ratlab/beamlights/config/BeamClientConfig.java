@@ -173,6 +173,13 @@ public final class BeamClientConfig {
             .comment("Luminance changes up to this many levels are ignored for midpoints and side rays (the central",
                     "hit point is always exact); applied together with the next move.")
             .defineInRange("luminanceHysteresis", 1, 0, 4);
+    public static final ModConfigSpec.BooleanValue LDL_CONE_LIGHT = B
+            .comment("LambDynamicLights only: also light a cone along each central beam (fades to half at the hit",
+                    "point, no occlusion). Ignored with Sodium Dynamic Lights. More section rebuilds while turning.")
+            .define("ldlConeLight", false);
+    public static final ModConfigSpec.IntValue LDL_CONE_LUMINANCE_OFFSET = B
+            .comment("Luminance of the ldlConeLight cone relative to the beam (at the emitter).")
+            .defineInRange("ldlConeLuminanceOffset", -3, -15, 0);
 
     static {
         B.pop();

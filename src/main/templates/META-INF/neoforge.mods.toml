@@ -7,12 +7,12 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="Rat Lab"
-credits="Thanks to the NeoForge, Sodium Dynamic Lights and Omega Flashlight authors."
+credits="Thanks to the NeoForge, Sodium Dynamic Lights, LambDynamicLights and Omega Flashlight authors."
 # Not required on the other side: client light and server spawn blocking each work alone.
 displayTest="IGNORE_ALL_VERSION"
 description='''
 Directional dynamic light for flashlights, helmet lamps and headlights: the beam lights the blocks it hits and the
-path along the way. Native Omega Flashlight support, Sodium Dynamic Lights backend.
+path along the way. Native Omega Flashlight support, Sodium Dynamic Lights and LambDynamicLights backends.
 '''
 
 [[dependencies.${mod_id}]]
@@ -33,6 +33,13 @@ path along the way. Native Omega Flashlight support, Sodium Dynamic Lights backe
     modId="sodiumdynamiclights"
     type="optional"
     versionRange="${sdl_version_range}"
+    ordering="AFTER"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="lambdynlights"
+    type="optional"
+    versionRange="${ldl_version_range}"
     ordering="AFTER"
     side="CLIENT"
 

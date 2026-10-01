@@ -1,7 +1,7 @@
 # Beam Lights for mod developers
 
 Beam Lights (NeoForge 1.21.1) turns "beams" emitted by entities into directional dynamic light on the client
-(Sodium Dynamic Lights backend) and into spawn blocking / mob attraction on the server. This page covers the ways
+(Sodium Dynamic Lights or LambDynamicLights backend, chosen at runtime; providers need not care which) and into spawn blocking / mob attraction on the server. This page covers the ways
 another mod, a modpack or a KubeJS script can add beams. Datapack beams (no code) are described in the
 [README](README.md#data-driven-beams-070).
 

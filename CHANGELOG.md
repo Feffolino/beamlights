@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.0 (unreleased)
+All five phases of the design are done: 1 single-beam dynamic light (SDL), 2 multi-ray cone, 3 spawn blocking (and
+optional mob attraction), 4 data-driven beams (datapack, Java API, item component, KubeJS), 5 LambDynamicLights
+backend. Version bumped to 1.0.0.
+- LambDynamicLights backend (`lambdynamiclights`): used when LambDynamicLights (mod id `lambdynlights`, 4.8+) is
+  installed instead of Sodium Dynamic Lights (the two mods exclude each other; SDL wins if both were present). Every
+  light point is a custom `DynamicLightBehavior` added through LDL's `DynamicLightBehaviorManager`; LDL evaluates
+  `lightAtPos` per block (sphere, level - 15/7.75 x distance, the same 7.75-block reach as SDL) and rebuilds the
+  sections of the old and new bounding box itself. LDL mode OFF removes every beam light.
+- Optional `ldlConeLight` (client config, default false; LDL only): one extra cone-shaped behavior per central beam,
+  apex at the emitter, length up to the hit point, cone half-angle from the beam, full level at the apex fading to half
+  at the end, falloff outside the cone surface; `ldlConeLuminanceOffset` (-3). No occlusion (like point lights).
+- Change gating shared by both backends (`GatedLightBackend`: SourceMotion gate, snap, exact resync, move budget);
+  cone changes go through the same gate and budget. `SdlBackend` is now a thin subclass, behaviour unchanged.
+- No dynamic lights mod: `/beamlights status` says "no dynamic lights mod installed (Sodium Dynamic Lights or
+  LambDynamicLights)".
+- Tests: `ConeLightTest` (axis fade, cone radius, apex sphere, past-the-end falloff, bounds cover every lit block).
+
 ## 0.9.0 (unreleased)
 - Motion-adaptive light updates (client config section `[motion]`, per emitter: the local player and every other
   emitter have their own state). Each trace measures the angular speed of the central beam direction (deg/s) and the

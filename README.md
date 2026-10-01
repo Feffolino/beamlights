@@ -1,13 +1,31 @@
 # Beam Lights
 
 Directional dynamic light for flashlights and lamps on NeoForge 1.21.1. The beam lights the block it hits and the
-path along the way through Sodium Dynamic Lights. Native Omega Flashlight support.
+path along the way through Sodium Dynamic Lights or LambDynamicLights (whichever is installed; they exclude each
+other). Native Omega Flashlight support.
 
 Build: `JAVA_HOME="/c/Program Files/Java/jdk-25" ./gradlew build` (jar in `build/libs/`).
 Debug: `/beamlights status`, `/beamlights debug overlay on`, `/beamlights debug render on`, `/beamlights debug dump`.
 
 Mod and pack developers: see [DEVELOPERS.md](DEVELOPERS.md) (Java API, `BeamCollectEvent`, the `beamlights:beam` item
 component, KubeJS, Maven artifacts).
+
+## LambDynamicLights backend (1.0.0)
+
+With LambDynamicLights 4.8+ (instead of Sodium Dynamic Lights) every light point becomes an LDL custom light behavior;
+LDL computes the light and rebuilds chunk sections itself. Same gating and budget as with SDL. Optional
+`ldlConeLight = true` (client config) adds a cone of light along each central beam (`ldlConeLuminanceOffset`, -3).
+
+Manual test (the dev run has neither mod):
+1. In a test instance remove Sodium Dynamic Lights and install LambDynamicLights 4.8.x for 1.21.1 (with its
+   dependencies), plus this jar.
+2. `/beamlights status`: backend `lambdynamiclights`, status `LDL mode FANCY` (or the mode set in LDL's options).
+3. Turn a flashlight on: hit point and midpoints lit, lights follow the beam; `/beamlights debug overlay on` shows
+   sources and moves.
+4. LDL options, mode OFF: beam lights disappear; back on: they return.
+5. Set `ldlConeLight = true` in `beamlights-client.toml`, `/beamlights reload`: a soft cone along the beam, the status
+   line shows `N cones`; turning fast stays within `maxMovesPerTick`.
+6. Leave and rejoin the world / change dimension: no leftover lights.
 
 ## Performance (0.8.0)
 

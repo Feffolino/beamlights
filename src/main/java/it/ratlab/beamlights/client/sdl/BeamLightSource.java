@@ -1,6 +1,7 @@
 package it.ratlab.beamlights.client.sdl;
 
 import it.ratlab.beamlights.api.math.V3;
+import it.ratlab.beamlights.client.PooledLight;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
@@ -14,7 +15,7 @@ import toni.sodiumdynamiclights.DynamicLightsMode;
 import toni.sodiumdynamiclights.SodiumDynamicLights;
 
 /** A free-floating SDL light source (no entity). Chunk tracking copied from SDL's entity implementation. */
-public final class BeamLightSource implements DynamicLightSource {
+public final class BeamLightSource implements DynamicLightSource, PooledLight {
     private final Level level;
     private double x, y, z;
     private boolean hasPosition;
@@ -29,11 +30,13 @@ public final class BeamLightSource implements DynamicLightSource {
         this.level = level;
     }
 
-    Level level() {
+    @Override
+    public Level level() {
         return level;
     }
 
-    boolean hasPosition() {
+    @Override
+    public boolean hasPosition() {
         return hasPosition;
     }
 
@@ -41,17 +44,19 @@ public final class BeamLightSource implements DynamicLightSource {
         return new V3(x, y, z);
     }
 
-    int luminance() {
+    @Override
+    public int luminance() {
         return luminance;
     }
 
-    /** Squared distance to p without allocating. */
-    double distSq(V3 p) {
+    @Override
+    public double distSq(V3 p) {
         double dx = x - p.x(), dy = y - p.y(), dz = z - p.z();
         return dx * dx + dy * dy + dz * dz;
     }
 
-    void set(V3 pos, int lum) {
+    @Override
+    public void set(V3 pos, int lum) {
         x = pos.x();
         y = pos.y();
         z = pos.z();
@@ -60,12 +65,18 @@ public final class BeamLightSource implements DynamicLightSource {
     }
 
     /** Turns the light off, rebuilds the sections it lit and unregisters it from SDL. */
-    void remove() {
+    @Override
+    public void remove() {
         luminance = 0;
         LevelRenderer renderer = Minecraft.getInstance().levelRenderer;
         if (renderer != null) sodiumdynamiclights$scheduleTrackedChunksRebuild(renderer);
         trackedLitChunkPos.clear();
         SodiumDynamicLights.get().removeLightSource(this);
+    }
+
+    @Override
+    public void touch() {
+        SodiumDynamicLights.updateTracking(this);
     }
 
     @Override public double sdl$getDynamicLightX() { return x; }

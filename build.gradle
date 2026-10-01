@@ -58,6 +58,11 @@ dependencies {
     compileOnly files('libs/sodiumdynamiclights-neoforge-1.0.10-1.21.1.jar')
     compileOnly files('libs/omegaflashlight-1.6.6-1.21.1.jar')
     compileOnly files('libs/curios-neoforge-9.5.1+1.21.1.jar')
+    // LambDynamicLights: NeoForge runtime + mojmap API, extracted from the nested jars of
+    // lambdynamiclights-4.8.11+1.21.1.jar (META-INF/jars/...-neoforge.jar and its nested ...-mojmap.jars: api, yumi,
+    // spruceui; the last two only so javac can resolve LambDynLights' supertypes).
+    compileOnly files('libs/ldl-neoforge-4.8.11.jar', 'libs/ldl-api-4.8.11.jar', 'libs/ldl-yumi-1.0.0-beta.1.jar',
+            'libs/ldl-spruceui-6.2.5.jar')
     compileOnly("dev.latvian.mods:kubejs-neoforge:2101.7.2-build.377") { transitive = false }
     compileOnly("dev.latvian.mods:rhino:2101.2.7-build.85") { transitive = false }
 
@@ -88,6 +93,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_license                  : mod_license,
             mod_version                  : mod_version,
             sdl_version_range            : sdl_version_range,
+            ldl_version_range            : ldl_version_range,
             omegaflashlight_version_range: omegaflashlight_version_range,
             curios_version_range         : curios_version_range,
             kubejs_version_range         : kubejs_version_range,
