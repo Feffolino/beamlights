@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 (unreleased)
+- `openAreaPattern` ([cone], default CENTER_ONLY): with `ldlConeLight` on, beams that get no cone (open area: hit
+  farther than `coneMaxDistanceForCone`, or no hit) use this side ray pattern instead of `rayPattern`, e.g.
+  `rayPattern = CENTER_ONLY` + `openAreaPattern = RING` = cone indoors, ring outdoors.
+  `/beamlights cone openArea <pattern>`.
+
 ## 1.1.0 (unreleased)
 Cone light performance (LDL `ldlConeLight`). Measured outdoors in a Lost Cities city (LambDynamicLights 4.8.11,
 CENTER_ONLY): 50 FPS with the cone vs 100 without; LDL went from 2.1 % to 10.4 % of the render thread (per

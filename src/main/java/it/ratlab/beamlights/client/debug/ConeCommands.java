@@ -8,6 +8,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.ConePolicy;
+import it.ratlab.beamlights.core.RayLayout;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -45,14 +46,34 @@ final class ConeCommands {
                 .then(doubleKey("apexHysteresis", "coneApexHysteresis", BeamClientConfig.CONE_APEX_HYSTERESIS, 0, 8))
                 .then(doubleKey("angleHysteresis", "coneAngleHysteresis", BeamClientConfig.CONE_ANGLE_HYSTERESIS,
                         0, 45))
+                .then(Commands.literal("openArea")
+                        .executes(c -> BeamClientCommands.current(c, "openAreaPattern",
+                                BeamClientConfig.OPEN_AREA_PATTERN.get()))
+                        .then(Commands.argument("pattern", StringArgumentType.word())
+                                .suggests((c, b) -> SharedSuggestionProvider.suggest(
+                                        java.util.Arrays.stream(RayLayout.Pattern.values()).map(Enum::name), b))
+                                .executes(ConeCommands::openArea)))
                 .then(Commands.literal("preset")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .suggests((c, b) -> SharedSuggestionProvider.suggest(PRESETS, b))
                                 .executes(ConeCommands::preset)));
     }
 
+    private static int openArea(CommandContext<CommandSourceStack> c) {
+        String name = StringArgumentType.getString(c, "pattern").toUpperCase(Locale.ROOT);
+        RayLayout.Pattern p;
+        try {
+            p = RayLayout.Pattern.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            BeamClientCommands.reply(c, "Unknown pattern " + name);
+            return 0;
+        }
+        return saved(c, BeamClientConfig.OPEN_AREA_PATTERN, p, "openAreaPattern");
+    }
+
     static String settingsLine() {
-        return "ldlConeLight " + BeamClientConfig.LDL_CONE_LIGHT.get() + ", ldlConeLuminanceOffset "
+        return "ldlConeLight " + BeamClientConfig.LDL_CONE_LIGHT.get() + ", openAreaPattern "
+                + BeamClientConfig.OPEN_AREA_PATTERN.get() + ", ldlConeLuminanceOffset "
                 + BeamClientConfig.LDL_CONE_LUMINANCE_OFFSET.get() + ", coneMaxAngle "
                 + BeamClientConfig.CONE_MAX_ANGLE.get() + ", coneMaxLength " + BeamClientConfig.CONE_MAX_LENGTH.get()
                 + ", coneMinLength " + BeamClientConfig.CONE_MIN_LENGTH.get() + ", coneMaxDistanceForCone "

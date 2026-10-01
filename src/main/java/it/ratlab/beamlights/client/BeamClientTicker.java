@@ -154,6 +154,25 @@ public final class BeamClientTicker {
                              double rangeFactor) {
     }
 
+    private static LayoutKey openKey;
+    private static List<RaySpec> openLayout = List.of();
+
+    /** Side rays for beams without a cone (open area) while the LDL cone light is on: openAreaPattern. */
+    private static List<RaySpec> openLayout() {
+        layout();
+        LayoutKey base = layoutKey;
+        LayoutKey k = new LayoutKey(BeamClientConfig.OPEN_AREA_PATTERN.get(), base.sideRays(), base.spread(),
+                base.rollOffset(), base.innerRays(), base.innerSpread(), base.custom(), base.lumOffset(),
+                base.midpoints(), base.rangeFactor());
+        if (k.equals(layoutKey)) return cachedLayout;
+        if (!k.equals(openKey)) {
+            openKey = k;
+            openLayout = RayLayout.build(k.pattern(), k.sideRays(), k.spread(), k.rollOffset(), k.innerRays(),
+                    k.innerSpread(), k.custom(), k.lumOffset(), k.midpoints(), k.rangeFactor());
+        }
+        return openLayout;
+    }
+
     private static List<RaySpec> layout() {
         LayoutKey k = new LayoutKey(BeamClientConfig.RAY_PATTERN.get(), BeamClientConfig.SIDE_RAYS.get(),
                 BeamClientConfig.CONE_SPREAD.get(), BeamClientConfig.RAY_ROLL_OFFSET.get(),
@@ -252,6 +271,7 @@ public final class BeamClientTicker {
         LightPointPlanner.Settings settingsNoMid = settings.withMidpoints(false);
         LightPointPlanner.Settings sideMid = settings.withMidpoints(true);
         List<RaySpec> layout = layout();
+        List<RaySpec> open = openLayout();
         int perEntity = BeamClientConfig.MAX_SOURCES_PER_ENTITY.get();
         LevelOcclusion occlusion = new LevelOcclusion(level);
         MotionGovernor.Settings motion = BeamClientConfig.motionSettings();
@@ -305,17 +325,20 @@ public final class BeamClientTicker {
             // Keys ray index = beam * 32 + sub (sub 0 = central), 8 bits: at most 8 beams per entity.
             int beamCount = Math.min(beams.size(), MAX_BEAMS_PER_ENTITY);
             int entityUsed = 0;
+            // Beams whose central ray got a cone (bit per beam); the others use the open area layout.
+            long coned = 0;
             // Pass 0: central rays of every beam, so they win the per-entity budget; pass 1: side rays (not in LOD).
             int passes = reduced ? 1 : 2;
             for (int pass = 0; pass < passes; pass++) {
                 boolean side = pass == 1;
-                if (side && layout.isEmpty()) break;
                 for (int bi = 0; bi < beamCount; bi++) {
                     Beam beam = beams.get(bi);
-                    List<V3> dirs = side ? ConeRays.directions(beam.dir(), beam.coneDeg(), layout) : null;
+                    List<RaySpec> beamLayout = cones && (coned & (1L << bi)) == 0 ? open : layout;
+                    if (side && beamLayout.isEmpty()) continue;
+                    List<V3> dirs = side ? ConeRays.directions(beam.dir(), beam.coneDeg(), beamLayout) : null;
                     int rays = side ? dirs.size() : 1;
                     for (int i = 0; i < rays; i++) {
-                        RaySpec spec = side ? layout.get(i) : null;
+                        RaySpec spec = side ? beamLayout.get(i) : null;
                         int lum = side ? Math.max(0, Math.min(15, beam.luminance() + spec.luminanceOffset()))
                                 : beam.luminance();
                         if (lum <= 0) continue;
@@ -328,9 +351,10 @@ public final class BeamClientTicker {
                                 occlusion);
                         if (cones && !side) {
                             int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
-                            cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT),
-                                    ConePolicy.target(rayBeam.origin(), rayBeam.dir(), trace.hit(), trace.distance(),
-                                            HIT_BACKOFF, beam.coneDeg(), coneLum, coneSettings)));
+                            ConeLight.Shape shape = ConePolicy.target(rayBeam.origin(), rayBeam.dir(), trace.hit(),
+                                    trace.distance(), HIT_BACKOFF, beam.coneDeg(), coneLum, coneSettings);
+                            if (shape != null) coned |= 1L << bi;
+                            cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT), shape));
                         }
                         LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)
                                 : spec.midpoints() ? sideMid : settingsNoMid;

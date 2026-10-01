@@ -246,6 +246,11 @@ public final class BeamClientConfig {
             .comment("Hit points farther than this (blocks), or no hit (open sky), get no cone: it fades out and only",
                     "the point lights remain.")
             .defineInRange("coneMaxDistanceForCone", 20.0, 4.0, 64.0);
+    public static final ModConfigSpec.EnumValue<RayLayout.Pattern> OPEN_AREA_PATTERN = B
+            .comment("Side ray pattern used instead of rayPattern when ldlConeLight is on but a beam gets no cone",
+                    "(open area: hit farther than coneMaxDistanceForCone, or no hit). Same values as rayPattern;",
+                    "CENTER_ONLY = just the hit point. The other layout keys (sideRays, coneSpread, ...) apply.")
+            .defineEnum("openAreaPattern", RayLayout.Pattern.CENTER_ONLY);
     public static final ModConfigSpec.DoubleValue CONE_END_FACTOR = B
             .comment("Cone level at the end relative to the apex.")
             .defineInRange("coneEndFactor", 0.5, 0.1, 1.0);
