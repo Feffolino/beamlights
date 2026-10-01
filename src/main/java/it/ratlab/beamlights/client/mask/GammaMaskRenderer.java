@@ -16,6 +16,7 @@ import it.ratlab.beamlights.core.MaskMath;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
@@ -45,20 +46,12 @@ public final class GammaMaskRenderer {
     private static GammaMask.LocalBeam fading;
     private static double blockLight;
     private static double skyLight;
-    private static double lastLightMax = 1;
 
     private GammaMaskRenderer() {
     }
 
     static double currentStrength() {
         return strength;
-    }
-
-    /** Diagnostics for the overlay: smoothed light levels at the lit point and the lightmap value there. */
-    static String diagnostics() {
-        double nv = BeamClientConfig.MASK_NIGHT_VISION.get();
-        return String.format(java.util.Locale.ROOT, "light block %.1f sky %.1f, lightmap %.3f, gain x%.1f",
-                blockLight, skyLight, lastLightMax, Math.max(1, nv / Math.max(0.02, lastLightMax)));
     }
 
     @EventBusSubscriber(modid = BeamLights.MOD_ID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -142,14 +135,17 @@ public final class GammaMaskRenderer {
         RenderTarget main = mc.getMainRenderTarget();
         int w = main.width, h = main.height;
         if (copy == null) {
-            copy = new TextureTarget(w, h, false, Minecraft.ON_OSX);
+            copy = new TextureTarget(w, h, true, Minecraft.ON_OSX);
         } else if (copy.width != w || copy.height != h) {
             copy.resize(w, h, Minecraft.ON_OSX);
         }
-        // The pass reads the main target's own colour and depth textures and writes into copy (no depth blit: it
-        // fails silently when the depth formats differ, e.g. with Veil or a stencil buffer); then the colour is
-        // blitted back (RGBA8 -> RGBA8 always works).
-        copy.bindWrite(true);
+        if (main.isStencilEnabled() && !copy.isStencilEnabled()) copy.enableStencil();
+
+        // Copy colour + depth (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST).
+        GlStateManager._glBindFramebuffer(0x8CA8, main.frameBufferId);
+        GlStateManager._glBindFramebuffer(0x8CA9, copy.frameBufferId);
+        GlStateManager._glBlitFrameBuffer(0, 0, w, h, 0, 0, w, h, 0x4000 | 0x100, 0x2600);
+        main.bindWrite(true);
 
         // Direction: follow the camera while the beam points where the player looks.
         V3 dir = b.dir();
@@ -169,8 +165,8 @@ public final class GammaMaskRenderer {
         float tb = (float) (1 - tint + tint * (rgb & 0xFF) / 255.0);
 
         ShaderInstance s = shader;
-        s.setSampler("ColorSampler", main.getColorTextureId());
-        s.setSampler("DepthSampler", main.getDepthTextureId());
+        s.setSampler("ColorSampler", copy.getColorTextureId());
+        s.setSampler("DepthSampler", copy.getDepthTextureId());
         s.safeGetUniform("InvViewProj").set(invViewProj);
         s.safeGetUniform("BeamOrigin").set((float) origin.x(), (float) origin.y(), (float) origin.z());
         s.safeGetUniform("BeamDir").set((float) dir.x(), (float) dir.y(), (float) dir.z());
@@ -181,8 +177,11 @@ public final class GammaMaskRenderer {
         s.safeGetUniform("Falloff").set(BeamClientConfig.MASK_FALLOFF.get().floatValue());
         s.safeGetUniform("Strength").set((float) strength);
         s.safeGetUniform("NightVision").set(BeamClientConfig.MASK_NIGHT_VISION.get().floatValue());
-        lastLightMax = LightmapReader.maxChannel(mc.gameRenderer.lightTexture(), blockLight, skyLight);
-        s.safeGetUniform("LightMax").set((float) lastLightMax);
+        // Lightmap (16x16, x = block light, y = sky light) sampled at the lit point's smoothed light levels.
+        LightTexture lt = mc.gameRenderer.lightTexture();
+        lt.turnOnLightLayer();
+        s.setSampler("LightSampler", RenderSystem.getShaderTexture(2));
+        s.safeGetUniform("LightUV").set((float) ((blockLight + 0.5) / 16.0), (float) ((skyLight + 0.5) / 16.0));
         s.safeGetUniform("Shading").set(BeamClientConfig.MASK_SHADING.get().floatValue());
         s.safeGetUniform("Knee").set(BeamClientConfig.MASK_KNEE.get().floatValue());
         s.safeGetUniform("BrightCutoff").set(BeamClientConfig.MASK_BRIGHT_CUTOFF.get().floatValue());
@@ -199,12 +198,6 @@ public final class GammaMaskRenderer {
         bb.addVertex(1, 1, 0);
         bb.addVertex(-1, 1, 0);
         BufferUploader.drawWithShader(bb.buildOrThrow());
-
-        // Colour back to the main target (GL_COLOR_BUFFER_BIT, GL_NEAREST).
-        GlStateManager._glBindFramebuffer(0x8CA8, copy.frameBufferId);
-        GlStateManager._glBindFramebuffer(0x8CA9, main.frameBufferId);
-        GlStateManager._glBlitFrameBuffer(0, 0, w, h, 0, 0, w, h, 0x4000, 0x2600);
-        main.bindWrite(true);
         RenderSystem.depthMask(true);
         RenderSystem.enableDepthTest();
     }

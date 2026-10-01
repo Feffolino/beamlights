@@ -7,6 +7,9 @@
         },
         {
             "name": "DepthSampler"
+        },
+        {
+            "name": "LightSampler"
         }
     ],
     "uniforms": [
@@ -144,11 +147,12 @@
             ]
         },
         {
-            "name": "LightMax",
+            "name": "LightUV",
             "type": "float",
-            "count": 1,
+            "count": 2,
             "values": [
-                1.0
+                0.03125,
+                0.03125
             ]
         }
     ]
