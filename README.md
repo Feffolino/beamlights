@@ -31,7 +31,9 @@ A light beam lights the block it hits and the path along the way, instead of a r
 | Curios (optional) | beam items in Curios slots |
 | KubeJS (optional) | script bindings |
 
-Without a dynamic lights mod nothing is drawn, but spawn blocking still works on the server.
+**Recommended: LambDynamicLights.** It is the tested setup and the only one with the cone light. Sodium Dynamic Lights
+works too (point lights only). Without a dynamic lights mod nothing is drawn, but spawn blocking still works on the
+server.
 
 **Sides**: install on the client for the light, on the server for spawn blocking, mob attraction and datapack beam
 definitions. Each side works alone; players without the mod can join a server that has it.
