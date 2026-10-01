@@ -16,6 +16,7 @@ import it.ratlab.beamlights.core.MaskMath;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
@@ -43,6 +44,8 @@ public final class GammaMaskRenderer {
     private static long lastNanos;
     /** Last drawn beam, kept while fading out. */
     private static GammaMask.LocalBeam fading;
+    private static double blockLight;
+    private static double skyLight;
 
     private GammaMaskRenderer() {
     }
@@ -98,7 +101,13 @@ public final class GammaMaskRenderer {
         double target = beam == null ? 0
                 : BeamClientConfig.MASK_STRENGTH.get() * Math.min(15, beam.luminance()) / 15.0 * ambientFactor();
         strength = MaskMath.approach(strength, target, dt, BeamClientConfig.MASK_FADE_SECONDS.get());
-        if (beam != null) fading = beam;
+        if (beam != null) {
+            // Light levels glide (about 10 levels/s) so the brightness does not jump between blocks.
+            boolean fresh = fading == null;
+            fading = beam;
+            blockLight = fresh ? beam.blockLight() : MaskMath.approach(blockLight, beam.blockLight(), dt, 0.1);
+            skyLight = fresh ? beam.skyLight() : MaskMath.approach(skyLight, beam.skyLight(), dt, 0.1);
+        }
         if (strength <= 0.001 || fading == null) {
             if (strength <= 0.001) fading = null;
             return;
@@ -167,7 +176,12 @@ public final class GammaMaskRenderer {
         s.safeGetUniform("Range").set((float) (b.range() * BeamClientConfig.MASK_RANGE_SCALE.get()));
         s.safeGetUniform("Falloff").set(BeamClientConfig.MASK_FALLOFF.get().floatValue());
         s.safeGetUniform("Strength").set((float) strength);
-        s.safeGetUniform("Gain").set(BeamClientConfig.MASK_GAIN.get().floatValue());
+        s.safeGetUniform("NightVision").set(BeamClientConfig.MASK_NIGHT_VISION.get().floatValue());
+        // Lightmap (16x16, x = block light, y = sky light) sampled at the lit point's smoothed light levels.
+        LightTexture lt = mc.gameRenderer.lightTexture();
+        lt.turnOnLightLayer();
+        s.setSampler("LightSampler", RenderSystem.getShaderTexture(2));
+        s.safeGetUniform("LightUV").set((float) ((blockLight + 0.5) / 16.0), (float) ((skyLight + 0.5) / 16.0));
         s.safeGetUniform("Shading").set(BeamClientConfig.MASK_SHADING.get().floatValue());
         s.safeGetUniform("Knee").set(BeamClientConfig.MASK_KNEE.get().floatValue());
         s.safeGetUniform("BrightCutoff").set(BeamClientConfig.MASK_BRIGHT_CUTOFF.get().floatValue());

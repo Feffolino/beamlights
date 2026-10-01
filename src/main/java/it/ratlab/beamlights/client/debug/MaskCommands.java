@@ -21,7 +21,7 @@ final class MaskCommands {
                 .then(Commands.literal("show").executes(MaskCommands::show))
                 .then(ConeCommands.boolKey("enabled", "gammaMask", BeamClientConfig.GAMMA_MASK))
                 .then(ConeCommands.doubleKey("strength", "maskStrength", BeamClientConfig.MASK_STRENGTH, 0, 3))
-                .then(ConeCommands.doubleKey("gain", "maskGain", BeamClientConfig.MASK_GAIN, 0, 20))
+                .then(ConeCommands.doubleKey("nightVision", "maskNightVision", BeamClientConfig.MASK_NIGHT_VISION, 0, 3))
                 .then(ConeCommands.doubleKey("shading", "maskShading", BeamClientConfig.MASK_SHADING, 0, 1))
                 .then(ConeCommands.doubleKey("knee", "maskKnee", BeamClientConfig.MASK_KNEE, 0.3, 1))
                 .then(ConeCommands.doubleKey("brightCutoff", "maskBrightCutoff", BeamClientConfig.MASK_BRIGHT_CUTOFF,
@@ -40,7 +40,7 @@ final class MaskCommands {
 
     static String settingsLine() {
         return "gammaMask " + BeamClientConfig.GAMMA_MASK.get() + ", maskStrength "
-                + BeamClientConfig.MASK_STRENGTH.get() + ", maskGain " + BeamClientConfig.MASK_GAIN.get()
+                + BeamClientConfig.MASK_STRENGTH.get() + ", maskNightVision " + BeamClientConfig.MASK_NIGHT_VISION.get()
                 + ", maskShading " + BeamClientConfig.MASK_SHADING.get() + ", maskKnee " + BeamClientConfig.MASK_KNEE.get()
                 + ", maskBrightCutoff " + BeamClientConfig.MASK_BRIGHT_CUTOFF.get() + ", maskAmbientFade "
                 + BeamClientConfig.MASK_AMBIENT_FADE.get() + ", maskBlackLift " + BeamClientConfig.MASK_BLACK_LIFT.get()

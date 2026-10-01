@@ -40,14 +40,15 @@ class MaskMathTest {
     }
 
     @Test
-    void lightMultipliesDarkKeepsContrastAndBright() {
-        assertEquals(0.05, MaskMath.light(0.05, 0.05, 0, 5, 0.65, 0.7, 0.015), EPS);
-        double a = MaskMath.light(0.04, 0.04, 1, 5, 0.65, 0.7, 0);
-        double b = MaskMath.light(0.08, 0.08, 1, 5, 0.65, 0.7, 0);
-        assertEquals(0.24, a, 1e-6);
-        assertEquals(2 * a, b, 1e-6); // contrast kept below the knee
-        assertEquals(0.9, MaskMath.light(0.9, 0.9, 1, 5, 0.65, 0.7, 0), EPS); // bright pixel untouched
-        assertTrue(MaskMath.light(0.5, 0.1, 1, 5, 0.65, 0.7, 0) < 1); // soft clip, never white
+    void nightVisionDividesByLightmap() {
+        assertEquals(0.05, MaskMath.light(0.05, 0.05, 0, 0.1, 1, 0.8, 1, 0), EPS); // outside the mask
+        assertEquals(0.5, MaskMath.light(0.05, 0.05, 1, 0.1, 1, 0.8, 1, 0), 1e-6); // texture as if fully lit
+        double a = MaskMath.light(0.02, 0.02, 1, 0.1, 1, 0.8, 1, 0);
+        double b = MaskMath.light(0.04, 0.04, 1, 0.1, 1, 0.8, 1, 0);
+        assertEquals(2 * a, b, 1e-6); // contrast kept
+        assertEquals(0.3, MaskMath.light(0.3, 0.3, 1, 1.0, 1, 0.8, 1, 0), EPS); // daylight: lightmap ~1, no change
+        assertEquals(0.9, MaskMath.light(0.9, 0.9, 1, 0.1, 1, 0.8, 0.7, 0), EPS); // bright pixel untouched
+        assertTrue(MaskMath.light(0.3, 0.1, 1, 0.1, 1, 0.8, 0.7, 0) < 1); // soft clip, never white
     }
 
     @Test

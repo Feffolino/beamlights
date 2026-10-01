@@ -87,7 +87,7 @@ public final class BeamClientTicker {
             lastLevel = null;
             STATS.reset();
             DebugState.setLastFrame(List.of());
-            GammaMask.publish(null, V3.ZERO, V3.ZERO);
+            GammaMask.publish(null, null, null, V3.ZERO, V3.ZERO);
             return;
         }
         if (level != lastLevel) {
@@ -266,6 +266,7 @@ public final class BeamClientTicker {
         boolean maskWanted = GammaMask.wanted();
         LightPointPlanner.Settings maskCentral = BeamClientConfig.MASK_MIDPOINTS.get() ? settings : settingsNoMid;
         Beam maskBeam = null;
+        V3 maskLightPos = null;
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -334,6 +335,10 @@ public final class BeamClientTicker {
                                 : beam;
                         BeamTracer.Result trace = BeamTracer.trace(rayBeam.origin(), rayBeam.dir(), rayBeam.range(),
                                 occlusion);
+                        if (masked && !side && bi == 0) {
+                            // Light level is read just in front of the lit face (inside the air block).
+                            maskLightPos = trace.point().sub(rayBeam.dir().normalize().scale(HIT_BACKOFF));
+                        }
                         if (cones && !side && !masked) {
                             int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
                             cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT),
@@ -381,7 +386,7 @@ public final class BeamClientTicker {
         }
         EMITTER_CACHE.values().removeIf(c -> c.lastSeen != tick);
         var look = player.getViewVector(1.0f);
-        GammaMask.publish(maskBeam, new V3(player.getX(), player.getEyeY(), player.getZ()),
+        GammaMask.publish(level, maskBeam, maskLightPos, new V3(player.getX(), player.getEyeY(), player.getZ()),
                 new V3(look.x, look.y, look.z));
 
         // Global cap on the smoothed output; ghosts come last, so they are the first to go.
