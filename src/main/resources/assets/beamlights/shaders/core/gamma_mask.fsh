@@ -1,6 +1,6 @@
 #version 150
 
-// Gamma mask: brightens the beam cone. Mirrors it.ratlab.beamlights.core.MaskMath (mask, lift).
+// Beam mask: adds light inside the beam cone. Mirrors it.ratlab.beamlights.core.MaskMath (mask, light, softClip).
 uniform sampler2D ColorSampler;
 uniform sampler2D DepthSampler;
 
@@ -12,35 +12,55 @@ uniform float CosInner;
 uniform float Range;
 uniform float Falloff;
 uniform float Strength;
-uniform float Gamma;
-uniform float Lift;
+uniform float Gain;
+uniform float Shading;
+uniform float Knee;
+uniform float BrightCutoff;
+uniform float BlackLift;
 uniform vec3 Tint;
 
 in vec2 texCoord;
 
 out vec4 fragColor;
 
+vec3 softClip(vec3 x) {
+    float r = 1.0 - Knee;
+    vec3 over = Knee + r * (1.0 - exp(-(x - Knee) / r));
+    return mix(x, over, step(Knee, x));
+}
+
 void main() {
     vec4 color = texture(ColorSampler, texCoord);
     float depth = texture(DepthSampler, texCoord).r;
+    vec4 clip = vec4(texCoord * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 world = InvViewProj * clip;
+    vec3 pos = world.xyz / world.w;
+    // Surface normal from screen-space derivatives, computed before any branch (derivatives need the whole quad).
+    vec3 n = cross(dFdx(pos), dFdy(pos));
     if (depth >= 1.0) { // sky
         fragColor = color;
         return;
     }
-    vec4 clip = vec4(texCoord * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-    vec4 world = InvViewProj * clip;
-    vec3 rel = world.xyz / world.w - BeamOrigin;
+    vec3 rel = pos - BeamOrigin;
     float dist = length(rel);
     if (dist >= Range || dist < 1e-4) {
         fragColor = color;
         return;
     }
-    float cone = smoothstep(CosOuter, CosInner, dot(rel / dist, BeamDir));
-    float m = Strength * cone * pow(1.0 - dist / Range, Falloff);
+    vec3 toLight = -rel / dist;
+    float cone = smoothstep(CosOuter, CosInner, dot(-toLight, BeamDir));
+    float nl = length(n);
+    float lambert = nl > 1e-8 ? abs(dot(n / nl, toLight)) : 1.0;
+    float shade = mix(1.0, lambert, Shading);
+    float m = Strength * cone * shade * pow(1.0 - dist / Range, Falloff);
     if (m <= 0.0) {
         fragColor = color;
         return;
     }
-    vec3 lifted = pow(max(color.rgb, vec3(0.0)), vec3(1.0 / (1.0 + Gamma * m))) + Lift * m * Tint;
-    fragColor = vec4(min(lifted, vec3(1.0)), color.a);
+    vec3 c = max(color.rgb, vec3(0.0));
+    float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    float g = Gain * m * (1.0 - smoothstep(BrightCutoff * 0.3, BrightCutoff, luma));
+    vec3 lit = c * (1.0 + g * Tint) + BlackLift * m * Tint;
+    // Light only adds: the knee never darkens pixels that were already bright.
+    fragColor = vec4(max(c, softClip(lit)), color.a);
 }
