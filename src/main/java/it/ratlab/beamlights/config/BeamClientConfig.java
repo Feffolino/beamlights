@@ -1,5 +1,7 @@
 package it.ratlab.beamlights.config;
 
+import it.ratlab.beamlights.core.ConeLight;
+import it.ratlab.beamlights.core.ConePolicy;
 import it.ratlab.beamlights.core.MotionGovernor;
 import it.ratlab.beamlights.core.RayLayout;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -178,8 +180,9 @@ public final class BeamClientConfig {
                     "hit point is always exact); applied together with the next move.")
             .defineInRange("luminanceHysteresis", 1, 0, 4);
     public static final ModConfigSpec.BooleanValue LDL_CONE_LIGHT = B
-            .comment("LambDynamicLights only: also light a cone along each central beam (fades to half at the hit",
-                    "point, no occlusion). Ignored with Sodium Dynamic Lights. More section rebuilds while turning.")
+            .comment("LambDynamicLights only: also light a cone along each central beam (fades to coneEndFactor at the",
+                    "hit point, no occlusion; shape and update rules in [cone]). Ignored with Sodium Dynamic Lights.",
+                    "More section rebuilds while turning.")
             .define("ldlConeLight", false);
     public static final ModConfigSpec.IntValue LDL_CONE_LUMINANCE_OFFSET = B
             .comment("Luminance of the ldlConeLight cone relative to the beam (at the emitter).")
@@ -222,6 +225,51 @@ public final class BeamClientConfig {
         B.pop();
     }
 
+    // Cone light (LambDynamicLights): size caps, falloff look and update rules of the ldlConeLight cone.
+    static {
+        B.comment("Cone light (LambDynamicLights). Shape and update rules of the ldlConeLight cone (ldlConeLight and",
+                "ldlConeLuminanceOffset stay in [performance]). A big cone covers a big bounding box: LDL evaluates",
+                "it for every entity and particle inside and rebuilds every section of the box on each change.",
+                "Keys: /beamlights cone ...; presets: /beamlights cone preset light|balanced|wide.").push("cone");
+    }
+
+    public static final ModConfigSpec.DoubleValue CONE_MAX_ANGLE = B
+            .comment("Half-angle cap (degrees) of the light cone; the visual beam keeps its own angle.")
+            .defineInRange("coneMaxAngle", 25.0, 5.0, 60.0);
+    public static final ModConfigSpec.DoubleValue CONE_MAX_LENGTH = B
+            .comment("Length cap (blocks) of the light cone.")
+            .defineInRange("coneMaxLength", 16.0, 4.0, 48.0);
+    public static final ModConfigSpec.DoubleValue CONE_MIN_LENGTH = B
+            .comment("Beams shorter than this (blocks, to the hit point) get no cone, only the point lights.")
+            .defineInRange("coneMinLength", 3.0, 0.0, 16.0);
+    public static final ModConfigSpec.DoubleValue CONE_MAX_DISTANCE = B
+            .comment("Hit points farther than this (blocks), or no hit (open sky), get no cone: it fades out and only",
+                    "the point lights remain.")
+            .defineInRange("coneMaxDistanceForCone", 20.0, 4.0, 64.0);
+    public static final ModConfigSpec.DoubleValue CONE_END_FACTOR = B
+            .comment("Cone level at the end relative to the apex.")
+            .defineInRange("coneEndFactor", 0.5, 0.1, 1.0);
+    public static final ModConfigSpec.DoubleValue CONE_EDGE_SOFTNESS = B
+            .comment("Soft edge: the outer fraction of the cone radius fades to half the level at the rim (0 = hard).")
+            .defineInRange("coneEdgeSoftness", 0.25, 0.0, 1.0);
+    public static final ModConfigSpec.BooleanValue CONE_FREEZE_WHEN_FAST = B
+            .comment("Keep the cone where it is while the emitter turns or moves fast (motion state FAST).")
+            .define("coneFreezeWhenFast", true);
+    public static final ModConfigSpec.DoubleValue CONE_LENGTH_HYSTERESIS = B
+            .comment("The cone changes only when its length moved at least this much (blocks), or apex / direction",
+                    "moved past their hysteresis, or its luminance changed.")
+            .defineInRange("coneLengthHysteresis", 2.0, 0.0, 8.0);
+    public static final ModConfigSpec.DoubleValue CONE_APEX_HYSTERESIS = B
+            .comment("Apex move (blocks) that changes the cone.")
+            .defineInRange("coneApexHysteresis", 1.0, 0.0, 8.0);
+    public static final ModConfigSpec.DoubleValue CONE_ANGLE_HYSTERESIS = B
+            .comment("Direction change (degrees) that changes the cone.")
+            .defineInRange("coneAngleHysteresis", 4.0, 0.0, 45.0);
+
+    static {
+        B.pop();
+    }
+
     public static final ModConfigSpec SPEC = B.build();
 
     private BeamClientConfig() {
@@ -230,6 +278,16 @@ public final class BeamClientConfig {
     public static MotionGovernor.Settings motionSettings() {
         return new MotionGovernor.Settings(FAST_TURN.get(), SLOW_TURN.get(), FAST_MOVE.get(), SIDE_UPDATE_TICKS.get(),
                 SETTLE_TICKS.get(), FAST_SIDE_MODE.get());
+    }
+
+    public static ConePolicy.Settings coneSettings() {
+        return new ConePolicy.Settings(CONE_MAX_ANGLE.get(), CONE_MAX_LENGTH.get(), CONE_MIN_LENGTH.get(),
+                CONE_MAX_DISTANCE.get(), CONE_LENGTH_HYSTERESIS.get(), CONE_APEX_HYSTERESIS.get(),
+                CONE_ANGLE_HYSTERESIS.get(), CONE_FREEZE_WHEN_FAST.get());
+    }
+
+    public static ConeLight.Look coneLook() {
+        return new ConeLight.Look(CONE_END_FACTOR.get(), CONE_EDGE_SOFTNESS.get());
     }
 
     public static int luminanceForTier(int tier) {

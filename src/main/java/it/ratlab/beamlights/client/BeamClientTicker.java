@@ -10,6 +10,7 @@ import it.ratlab.beamlights.config.BeamClientConfig;
 import it.ratlab.beamlights.core.BeamRegistry;
 import it.ratlab.beamlights.core.BeamTracer;
 import it.ratlab.beamlights.core.ConeLight;
+import it.ratlab.beamlights.core.ConePolicy;
 import it.ratlab.beamlights.core.ConeRays;
 import it.ratlab.beamlights.core.ConeSmoother;
 import it.ratlab.beamlights.core.Keys;
@@ -183,6 +184,8 @@ public final class BeamClientTicker {
         final List<LightSmoother.Target> targets = new ArrayList<>();
         final List<TracedBeam> frame = new ArrayList<>();
         final List<ConeTarget> cones = new ArrayList<>();
+        /** Cones shown per key (ConePolicy hysteresis and FAST freeze). */
+        final Map<Long, ConeLight.Shape> heldCones = new HashMap<>();
         final MotionGovernor motion = new MotionGovernor();
         long lastSeen;
         long lastTraced;
@@ -190,13 +193,14 @@ public final class BeamClientTicker {
         boolean lod;
     }
 
-    /** Cone light of one central beam (LambDynamicLights ldlConeLight). */
+    /** Cone light of one central beam (LambDynamicLights ldlConeLight); shape null = no cone this trace. */
     private record ConeTarget(long key, ConeLight.Shape shape) {
     }
 
     // Reused every tick (client thread only).
     private static final List<ConeTarget> CONES = new ArrayList<>();
     private static final List<ConeSmoother.Target> CONE_IN = new ArrayList<>();
+    private static final Set<Long> CONE_KEYS = new HashSet<>();
     private static final Map<Integer, EmitterCache> EMITTER_CACHE = new HashMap<>();
     private static final List<Entity> EMITTERS = new ArrayList<>();
     private static final List<LightSmoother.Target> TARGETS = new ArrayList<>();
@@ -207,6 +211,23 @@ public final class BeamClientTicker {
     /** Entity ids whose emitter just settled (MotionGovernor resync): their lights skip the hysteresis. */
     private static final Set<Integer> RESYNC = new HashSet<>();
     private static long tickCounter;
+
+    /** Applies the cone hysteresis / FAST freeze to the emitter's fresh cones; drops cones without a shape. */
+    private static void gateCones(EmitterCache cache, boolean fast, ConePolicy.Settings s) {
+        List<ConeTarget> list = cache.cones;
+        CONE_KEYS.clear();
+        int w = 0;
+        for (int i = 0; i < list.size(); i++) {
+            ConeTarget c = list.get(i);
+            ConeLight.Shape shown = ConePolicy.gate(cache.heldCones.get(c.key()), c.shape(), fast, s);
+            if (shown == null) continue;
+            CONE_KEYS.add(c.key());
+            list.set(w++, shown == c.shape() ? c : new ConeTarget(c.key(), shown));
+        }
+        while (list.size() > w) list.remove(list.size() - 1);
+        cache.heldCones.keySet().retainAll(CONE_KEYS);
+        for (ConeTarget c : list) cache.heldCones.put(c.key(), c.shape());
+    }
 
     private static void tick(ClientLevel level, LocalPlayer player, LightBackend b) {
         long t0 = System.nanoTime();
@@ -238,6 +259,7 @@ public final class BeamClientTicker {
         CONES.clear();
         boolean cones = b.wantsBeams();
         int coneOffset = BeamClientConfig.LDL_CONE_LUMINANCE_OFFSET.get();
+        ConePolicy.Settings coneSettings = BeamClientConfig.coneSettings();
 
         List<Entity> emitters = EMITTERS;
         emitters.clear();
@@ -306,9 +328,9 @@ public final class BeamClientTicker {
                                 occlusion);
                         if (cones && !side) {
                             int coneLum = Math.max(0, Math.min(15, lum + coneOffset));
-                            double len = trace.hit() ? Math.max(0, trace.distance() - HIT_BACKOFF) : rayBeam.range();
-                            if (coneLum > 0) cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT),
-                                    new ConeLight.Shape(rayBeam.origin(), rayBeam.dir(), len, beam.coneDeg(), coneLum)));
+                            cache.cones.add(new ConeTarget(Keys.of(e.getId(), ray, ConeLight.SLOT),
+                                    ConePolicy.target(rayBeam.origin(), rayBeam.dir(), trace.hit(), trace.distance(),
+                                            HIT_BACKOFF, beam.coneDeg(), coneLum, coneSettings)));
                         }
                         LightPointPlanner.Settings s = !side ? (reduced ? settingsNoMid : settings)
                                 : spec.midpoints() ? sideMid : settingsNoMid;
@@ -340,6 +362,7 @@ public final class BeamClientTicker {
             }
             cache.lastTraced = tick;
             cache.motion.filter(fresh, cache.targets, motion);
+            gateCones(cache, cache.motion.state() == MotionGovernor.State.FAST, coneSettings);
             STATS.suppressed += cache.motion.suppressed();
             if (cache.motion.resync()) RESYNC.add(e.getId());
             if (local) STATS.setMotion(cache.motion.state(), cache.motion.turnDegPerSec(),

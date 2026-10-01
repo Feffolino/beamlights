@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+Cone light performance (LDL `ldlConeLight`). Measured outdoors in a Lost Cities city (LambDynamicLights 4.8.11,
+CENTER_ONLY): 50 FPS with the cone vs 100 without; LDL went from 2.1 % to 10.4 % of the render thread (per
+entity/particle light lookups, spatial lookup rebuild) and Sodium from 10.0 % to 14.6 % (section rebuilds), because the
+cone's bounding box was huge (range 22, half-angle 42, loose cube).
+- Smaller cone: half-angle capped by `coneMaxAngle` (25; the visual beam is unchanged), length by `coneMaxLength` (16);
+  beams shorter than `coneMinLength` (3) get no cone; hits farther than `coneMaxDistanceForCone` (20) or no hit (open
+  sky) get no cone, it fades out and the point lights remain.
+- Tight bounding box computed from apex, axis, length and radius: a typical outdoor beam hitting at 16.5 blocks now
+  covers 48 LDL cells / 27 sections instead of 216 / 80 (open sky: none instead of 343 / 125).
+- Cheaper `lightAtPos`: immutable `ConeLight.Prepared` snapshot with precomputed axis, tan, slope and reach; box, axial
+  and lateral rejects before any square root; no allocation (the bounding box record is built once per update).
+- Fewer updates: cone frozen while the emitter is FAST (`coneFreezeWhenFast`), hysteresis on length
+  (`coneLengthHysteresis` 2.0), apex (`coneApexHysteresis` 1.0) and direction (`coneAngleHysteresis` 4 degrees); still
+  through ConeSmoother, the central-ray gate and the move budget.
+- Look: `coneEndFactor` (0.5) level at the end, `coneEdgeSoftness` (0.25) soft rim.
+- New client config section `[cone]`; `ldlConeLight` and `ldlConeLuminanceOffset` keep their names and place.
+- `/beamlights cone` (show all), `/beamlights cone <key> [value]`, `/beamlights cone preset light|balanced|wide`.
+- Tests: `ConeLightTest` (tight bounds, cell count, fast path vs reference on random points, soft edge),
+  `ConePolicyTest` (caps, max distance, min length, hysteresis, freeze). 144 tests.
+
 ## 1.0.1 (unreleased)
 - Cone light smoothing (LDL `ldlConeLight`, needs `smoothing`): a cone length jump (near face to far face,
   >= `jumpDistance`) is walked in `coneSteps` (new, default 3, `/beamlights smoothing conesteps <n>`) equal steps,

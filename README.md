@@ -16,6 +16,31 @@ With LambDynamicLights 4.8+ (instead of Sodium Dynamic Lights) every light point
 LDL computes the light and rebuilds chunk sections itself. Same gating and budget as with SDL. Optional
 `ldlConeLight = true` (client config) adds a cone of light along each central beam (`ldlConeLuminanceOffset`, -3).
 
+### Cone light (1.1.0)
+
+The cone is meant for indoor and near hits: outdoors a long, wide cone made LDL evaluate it for every entity and
+particle and rebuild many sections (50 vs 100 FPS measured). Client config section `[cone]`, all keys also editable
+with `/beamlights cone <key> [value]` (no value = show; `/beamlights cone` shows all; saved at once):
+
+| Key | Command | Default | Meaning |
+|---|---|---|---|
+| `ldlConeLight` | `enabled` | false | cone on/off (in `[performance]`, name unchanged) |
+| `ldlConeLuminanceOffset` | `luminanceOffset` | -3 | cone level relative to the beam (in `[performance]`) |
+| `coneMaxAngle` | `maxAngle` | 25 | half-angle cap in degrees, 5..60 (the visual beam keeps its angle) |
+| `coneMaxLength` | `maxLength` | 16 | length cap in blocks, 4..48 |
+| `coneMinLength` | `minLength` | 3 | shorter beams get no cone, only the point lights |
+| `coneMaxDistanceForCone` | `maxDistance` | 20 | farther hits or no hit (sky): no cone, it fades out |
+| `coneEndFactor` | `endFactor` | 0.5 | level at the end relative to the apex, 0.1..1 |
+| `coneEdgeSoftness` | `edgeSoftness` | 0.25 | outer fraction of the radius fading to half at the rim, 0..1 |
+| `coneFreezeWhenFast` | `freezeWhenFast` | true | keep the cone while the beam turns or moves fast |
+| `coneLengthHysteresis` | `lengthHysteresis` | 2.0 | length change (blocks) that updates the cone |
+| `coneApexHysteresis` | `apexHysteresis` | 1.0 | apex move (blocks) that updates the cone |
+| `coneAngleHysteresis` | `angleHysteresis` | 4 | direction change (degrees) that updates the cone |
+
+Presets: `/beamlights cone preset light` (angle 18, length 12, max distance 14), `balanced` (the defaults), `wide`
+(angle 35, length 24, max distance 28); all keep `freezeWhenFast` on and reset min length and hysteresis to the
+defaults.
+
 Manual test (the dev run has neither mod):
 1. In a test instance remove Sodium Dynamic Lights and install LambDynamicLights 4.8.x for 1.21.1 (with its
    dependencies), plus this jar.

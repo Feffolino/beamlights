@@ -6,29 +6,36 @@ import it.ratlab.beamlights.core.ConeLight;
 import net.minecraft.core.BlockPos;
 
 /**
- * Cone light along a central beam (config ldlConeLight): falloff from ConeLight, bounding box = cone plus reach.
- * Shape snapshots are immutable and published through a volatile field (read by LDL's meshing threads).
+ * Cone light along a central beam (config ldlConeLight): falloff and tight bounding box from ConeLight.Prepared.
+ * Snapshots are immutable and published through a volatile field (read by LDL's meshing threads); lightAtPos
+ * allocates nothing and rejects blocks outside the box or the cone's reach before any square root.
  */
 final class LdlConeLight implements DynamicLightBehavior {
     private final DynamicLightBehaviorManager manager;
-    private volatile ConeLight.Shape shape;
-    private volatile ConeLight.Box box;
-    private ConeLight.Shape lastSeen;
+    private volatile ConeLight.Prepared prepared;
+    private volatile BoundingBox box;
+    private ConeLight.Prepared lastSeen;
     private volatile boolean removed;
 
-    LdlConeLight(DynamicLightBehaviorManager manager, ConeLight.Shape shape) {
+    LdlConeLight(DynamicLightBehaviorManager manager, ConeLight.Shape shape, ConeLight.Look look) {
         this.manager = manager;
-        update(shape);
+        update(shape, look);
         manager.add(this);
     }
 
     ConeLight.Shape shape() {
-        return shape;
+        return prepared.shape();
     }
 
-    void update(ConeLight.Shape s) {
-        box = ConeLight.bounds(s, LdlBackend.FALLOFF);
-        shape = s;
+    ConeLight.Look look() {
+        return prepared.look();
+    }
+
+    void update(ConeLight.Shape s, ConeLight.Look look) {
+        ConeLight.Prepared p = new ConeLight.Prepared(s, look, LdlBackend.FALLOFF);
+        ConeLight.Box b = p.box();
+        box = new BoundingBox(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ());
+        prepared = p;
     }
 
     void remove() {
@@ -38,20 +45,19 @@ final class LdlConeLight implements DynamicLightBehavior {
 
     @Override
     public double lightAtPos(BlockPos pos, double falloffRatio) {
-        return ConeLight.lightAtBlock(shape, pos.getX(), pos.getY(), pos.getZ(), falloffRatio);
+        return prepared.lightAtBlock(pos.getX(), pos.getY(), pos.getZ(), falloffRatio);
     }
 
     @Override
     public BoundingBox getBoundingBox() {
-        ConeLight.Box b = box;
-        return new BoundingBox(b.minX(), b.minY(), b.minZ(), b.maxX(), b.maxY(), b.maxZ());
+        return box;
     }
 
     @Override
     public boolean hasChanged() {
-        ConeLight.Shape s = shape;
-        if (s == lastSeen) return false;
-        lastSeen = s;
+        ConeLight.Prepared p = prepared;
+        if (p == lastSeen) return false;
+        lastSeen = p;
         return true;
     }
 

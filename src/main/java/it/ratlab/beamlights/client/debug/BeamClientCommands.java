@@ -53,6 +53,7 @@ public final class BeamClientCommands {
                 .then(LayoutCommands.build())
                 .then(PerfCommands.build())
                 .then(MotionCommands.build())
+                .then(ConeCommands.build())
                 .then(smoothing())
                 .then(Commands.literal("debug")
                         .then(toggle("overlay", DebugState::setOverlay))

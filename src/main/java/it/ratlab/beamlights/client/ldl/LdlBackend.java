@@ -75,26 +75,27 @@ public final class LdlBackend extends GatedLightBackend<LdlPointLight> {
         if (!wantsBeams()) return;
         seenCones.add(key);
         LdlConeLight c = cones.get(key);
+        ConeLight.Look look = BeamClientConfig.coneLook();
         double displacement;
         if (c != null) {
             ConeLight.Shape old = c.shape();
             double d = ConeLight.displacementSq(old, cone);
             if (!SourceMotion.shouldChange(d, old.luminance(), cone.luminance(), true, gate(exact))
-                    && Math.abs(old.halfAngleDeg() - cone.halfAngleDeg()) < 1.0) return;
+                    && Math.abs(old.halfAngleDeg() - cone.halfAngleDeg()) < 1.0 && look.equals(c.look())) return;
             int dl = cone.luminance() - old.luminance();
             displacement = d + dl * dl;
         } else {
             displacement = APPEAR_DISPLACEMENT + cone.luminance();
         }
-        offerExtra(key, priority, viewer().distSq(cone.origin()), displacement, () -> applyCone(key, cone));
+        offerExtra(key, priority, viewer().distSq(cone.origin()), displacement, () -> applyCone(key, cone, look));
     }
 
-    private void applyCone(long key, ConeLight.Shape cone) {
+    private void applyCone(long key, ConeLight.Shape cone, ConeLight.Look look) {
         LdlConeLight c = cones.get(key);
         if (c == null) {
-            cones.put(key, new LdlConeLight(manager, cone));
+            cones.put(key, new LdlConeLight(manager, cone, look));
         } else {
-            c.update(cone);
+            c.update(cone, look);
         }
         coneMoves++;
     }
