@@ -61,6 +61,7 @@ The debug overlay shows moves/s and estimated rebuilds/s.
 
 ## For pack and mod developers
 
+- **[Wiki](https://github.com/Feffolino/beamlights/wiki)**: comprehensive player, admin, and pack-maker guide (1.21.1 NeoForge, 1.20.1 Forge coming soon)
 - Datapack beams: `data/<ns>/beamlights/beams/*.json`, examples in [`examples/datapack`](examples/datapack).
 - Layout profiles: `assets/<ns>/beamlights/layouts/*.json`, example in [`examples/resourcepack`](examples/resourcepack).
 - Java API, `BeamCollectEvent`, item data, KubeJS, Maven: [DEVELOPERS.md](DEVELOPERS.md).
