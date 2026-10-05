@@ -1,1 +1,0 @@
-Directional dynamic light for flashlights and lamps: the beam lights what you point at. Sodium Dynamic Lights / LambDynamicLights, Omega Flashlight support, datapack beams.
