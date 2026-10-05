@@ -1,7 +1,62 @@
+### Gradle ###
 .gradle/
 build/
-run/
-out/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/**/build/
+
+### IntelliJ IDEA ###
 .idea/
+*.iws
 *.iml
+*.ipr
+out/
+!**/src/**/out/
+
+.run/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.eclipse/
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/**/bin/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Windows ###
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+### Minecraft Modding ###
+run/
+!**/src/**/run/
+**/src/generated/**/.cache/
+repo/
+!**/src/**/repo/
+run-kubejs/
+
+### Beam Lights ###
 libs/*.jar
+!gradle/wrapper/gradle-wrapper.jar
+__pycache__/
+*.pyc
+
+# AI prompt files
+PROMPT.md
+prompt.md
+
+# Large raw graphics source files
+*.psd
+
+# Private publishing checklist (kept local)
+PUBLISH_CURSEFORGE.md
